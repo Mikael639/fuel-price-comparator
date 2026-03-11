@@ -1,10 +1,11 @@
 [CmdletBinding()]
 param(
   [string]$Server = $(if ($env:FUELFLASH_DEPLOY_SERVER) { $env:FUELFLASH_DEPLOY_SERVER } else { "ubuntu@145.241.164.91" }),
+  [switch]$DryRun,
   [string]$KeyPath = $(if ($env:FUELFLASH_DEPLOY_KEY) {
       $env:FUELFLASH_DEPLOY_KEY
     } else {
-      Join-Path $PSScriptRoot "..\\.local\\ssh\\ssh-key-2026-03-11.key"
+      ""
     }),
   [string]$RemoteDeployCommand = $(if ($env:FUELFLASH_DEPLOY_COMMAND) {
       $env:FUELFLASH_DEPLOY_COMMAND
@@ -15,13 +16,36 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$archivePath = Join-Path $PSScriptRoot "..\\dist.tar.gz"
+$scriptRoot = if ($PSScriptRoot) {
+  $PSScriptRoot
+} elseif ($PSCommandPath) {
+  Split-Path -Parent $PSCommandPath
+} else {
+  Join-Path (Get-Location).Path "scripts"
+}
+
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot ".."))
+
+if ([string]::IsNullOrWhiteSpace($KeyPath)) {
+  $KeyPath = Join-Path $repoRoot ".local\\ssh\\ssh-key-2026-03-11.key"
+}
+
+$archivePath = Join-Path $repoRoot "dist.tar.gz"
 
 if (!(Test-Path $KeyPath)) {
   throw "SSH key not found: $KeyPath"
 }
 
-Push-Location (Join-Path $PSScriptRoot "..")
+if ($DryRun) {
+  Write-Host "Repo root: $repoRoot"
+  Write-Host "SSH key: $KeyPath"
+  Write-Host "Archive: $archivePath"
+  Write-Host "Server: $Server"
+  Write-Host "Remote command: $RemoteDeployCommand"
+  exit 0
+}
+
+Push-Location $repoRoot
 try {
   npm run build
 

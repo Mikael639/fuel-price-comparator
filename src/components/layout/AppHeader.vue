@@ -8,9 +8,9 @@ const route = useRoute();
 
 const isDark = computed(() => stationStore.themeName === "fuelDark");
 const navigationItems = [
-  { label: "Accueil", to: { name: "home" } },
-  { label: "Tendances", to: { name: "insights" } },
-  { label: "Europe", to: { name: "europe" } },
+  { label: "Accueil", icon: "mdi-home-variant-outline", to: { name: "home" } },
+  { label: "Tendances", icon: "mdi-chart-line", to: { name: "insights" } },
+  { label: "Europe", icon: "mdi-earth", to: { name: "europe" } },
 ];
 const activeRouteName = computed(() => String(route.name ?? "home"));
 
@@ -55,6 +55,7 @@ const toggleTheme = () => {
             :key="item.label"
             class="header-bar__nav-link"
             :color="activeRouteName === String(item.to.name) ? 'secondary' : undefined"
+            :prepend-icon="item.icon"
             :to="item.to"
             :variant="activeRouteName === String(item.to.name) ? 'flat' : 'text'"
           >
@@ -116,6 +117,7 @@ const toggleTheme = () => {
   font-family: var(--ff-display);
   font-size: 1.15rem;
   letter-spacing: -0.04em;
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .header-bar__actions {
@@ -137,6 +139,9 @@ const toggleTheme = () => {
 .header-bar__nav-link {
   min-width: 0;
   border-radius: 999px;
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .header-bar__theme {
@@ -158,19 +163,77 @@ const toggleTheme = () => {
 }
 
 @media (max-width: 720px) {
+  .header-bar {
+    height: auto !important;
+  }
+
   .header-bar__inner {
     flex-wrap: wrap;
+    gap: 0.85rem;
   }
 
   .header-bar__actions {
     width: 100%;
+    align-items: stretch;
     justify-content: space-between;
   }
 
   .header-bar__nav {
     flex: 1;
-    justify-content: space-between;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding: 0.35rem;
+    border-radius: 20px;
+    overflow: visible;
+  }
+
+  .header-bar__nav-link {
+    min-height: 3rem;
+    padding-inline: 0.5rem;
+    font-size: 0.84rem;
+  }
+
+  .header-bar__theme {
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .header-bar__eyebrow {
+    display: none;
+  }
+
+  .header-bar__title {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-bar__brand {
+    gap: 0.6rem;
+  }
+
+  .header-bar__badge {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .header-bar__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .header-bar__nav {
+    width: 100%;
+  }
+
+  .header-bar__theme {
+    align-self: flex-end;
+  }
+
+  .header-bar__nav-link {
+    min-height: 3.2rem;
+    font-size: 0.78rem;
   }
 }
 </style>
