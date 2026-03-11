@@ -3,6 +3,7 @@ node_modules/
 
 # build outputs
 dist/
+dist.tar.gz
 coverage/
 .vite/
 .next/
@@ -33,3 +34,8 @@ Thumbs.db
 # local debug artifacts
 .vite-dev.err.log
 .vite-dev.out.log
+
+# local secrets
+.local/
+*.key
+*.pem

@@ -2,6 +2,7 @@ import "vuetify/styles";
 import "@mdi/font/css/materialdesignicons.css";
 import { createVuetify } from "vuetify";
 import { aliases, mdi } from "vuetify/iconsets/mdi";
+import { appConfig } from "@/config/app";
 
 export const vuetify = createVuetify({
   icons: {
@@ -12,7 +13,7 @@ export const vuetify = createVuetify({
     },
   },
   theme: {
-    defaultTheme: "fuelLight",
+    defaultTheme: appConfig.theme.defaultTheme,
     themes: {
       fuelLight: {
         dark: false,

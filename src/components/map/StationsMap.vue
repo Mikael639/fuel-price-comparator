@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
+import { useDisplay } from "vuetify";
+import { appConfig } from "@/config/app";
 import L from "leaflet";
 import "leaflet.markercluster";
 import { useFuelStationsStore } from "@/stores/fuelStations";
@@ -20,11 +22,13 @@ const props = defineProps<{
 const router = useRouter();
 const stationStore = useFuelStationsStore();
 const { themeName } = storeToRefs(stationStore);
+const { smAndDown } = useDisplay();
 
 const mapElement = ref<HTMLDivElement | null>(null);
 const mapShell = ref<HTMLDivElement | null>(null);
 const isFullscreen = ref(false);
 const selectedStationId = ref<string | null>(null);
+const isLegendExpanded = ref(false);
 
 let map: L.Map | null = null;
 let overlayLayer: L.LayerGroup | null = null;
@@ -35,21 +39,21 @@ let currentBounds: L.LatLngBounds | null = null;
 const tileLayerConfig = computed(() => {
   if (themeName.value === "fuelDark") {
     return {
-      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      url: appConfig.map.darkTilesUrl,
       options: {
         subdomains: "abcd",
         maxZoom: 20,
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+        attribution: appConfig.map.tileAttribution,
       },
     };
   }
 
   return {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    url: appConfig.map.lightTilesUrl,
     options: {
       subdomains: "abcd",
       maxZoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      attribution: appConfig.map.tileAttribution,
     },
   };
 });
@@ -60,6 +64,14 @@ const mobilePriceMarkerIds = computed(() => pricedStations.value.slice(0, 2).map
 const selectedStation = computed(
   () => props.stations.find((station) => station.id === selectedStationId.value) ?? null,
 );
+const showLegend = computed(() => !smAndDown.value || isLegendExpanded.value);
+const fullscreenButtonLabel = computed(() => {
+  if (!smAndDown.value) {
+    return undefined;
+  }
+
+  return isFullscreen.value ? "Quitter" : "Plein ecran";
+});
 
 const createMarkerIcon = (
   className: string,
@@ -306,6 +318,10 @@ const openSelectedStation = () => {
   }
 };
 
+const toggleLegend = () => {
+  isLegendExpanded.value = !isLegendExpanded.value;
+};
+
 watch(
   () => props.bestStationId,
   (value) => {
@@ -344,6 +360,14 @@ watch(tileLayerConfig, () => {
   applyBaseLayer();
   invalidateMapSize();
 });
+
+watch(
+  smAndDown,
+  (value) => {
+    isLegendExpanded.value = !value;
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   document.removeEventListener("fullscreenchange", syncFullscreenState);
@@ -395,6 +419,7 @@ onBeforeUnmount(() => {
         <v-btn
           color="secondary"
           :icon="isFullscreen ? 'mdi-fullscreen-exit' : 'mdi-fullscreen'"
+          :text="fullscreenButtonLabel"
           variant="tonal"
           @click="toggleFullscreen"
         />
@@ -409,7 +434,23 @@ onBeforeUnmount(() => {
       <div class="stations-map__aurora stations-map__aurora--top" />
       <div class="stations-map__aurora stations-map__aurora--bottom" />
 
-      <div class="stations-map__legend">
+      <v-btn
+        v-if="smAndDown"
+        class="stations-map__legend-toggle"
+        color="white"
+        :prepend-icon="showLegend ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+        rounded="pill"
+        size="small"
+        variant="elevated"
+        @click="toggleLegend"
+      >
+        {{ showLegend ? "Masquer" : "Repères" }}
+      </v-btn>
+
+      <div
+        v-if="showLegend"
+        class="stations-map__legend"
+      >
         <div class="map-legend__item">
           <span class="map-legend__dot map-legend__dot--user" />
           <span>Votre position</span>
@@ -439,6 +480,13 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div
+        v-if="smAndDown"
+        class="stations-map__mobile-tip"
+      >
+        Astuce : ouvre la carte en plein ecran pour bouger plus facilement.
+      </div>
+
       <div class="stations-map__credit">
         Fond CARTO + OpenStreetMap
       </div>
@@ -454,6 +502,11 @@ onBeforeUnmount(() => {
           class="map-selection-sheet"
           :class="{ 'map-selection-sheet--dark': themeName === 'fuelDark' }"
         >
+          <div
+            v-if="smAndDown"
+            class="map-selection-sheet__handle"
+          />
+
           <div class="d-flex align-start justify-space-between ga-3 mb-2">
             <div>
               <p class="text-caption mb-1">{{ selectedStation.brand }}</p>
@@ -493,11 +546,12 @@ onBeforeUnmount(() => {
             </v-chip>
           </div>
 
-          <div class="d-flex ga-2">
+          <div class="map-selection-sheet__actions">
             <v-btn
               color="secondary"
               prepend-icon="mdi-eye-outline"
               variant="tonal"
+              :block="smAndDown"
               @click="openSelectedStation"
             >
               Voir details
@@ -506,6 +560,7 @@ onBeforeUnmount(() => {
               color="primary"
               :href="getGoogleMapsDirectionsUrl(selectedStation.lat, selectedStation.lng)"
               prepend-icon="mdi-navigation-variant-outline"
+              :block="smAndDown"
               target="_blank"
             >
               Y aller
@@ -572,6 +627,14 @@ onBeforeUnmount(() => {
   background: rgba(255, 209, 102, 0.42);
 }
 
+.stations-map__legend-toggle {
+  position: absolute;
+  z-index: 4;
+  top: 1rem;
+  right: 1.25rem;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+}
+
 .stations-map__legend {
   position: absolute;
   z-index: 3;
@@ -587,6 +650,22 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.84);
   backdrop-filter: blur(12px);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+}
+
+.stations-map__mobile-tip {
+  position: absolute;
+  z-index: 3;
+  left: 1.25rem;
+  right: 1.25rem;
+  bottom: 7rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.74);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  backdrop-filter: blur(10px);
 }
 
 .stations-map__credit {
@@ -673,6 +752,14 @@ onBeforeUnmount(() => {
   color: rgba(226, 247, 241, 0.82);
 }
 
+.map-selection-sheet__handle {
+  width: 3.2rem;
+  height: 0.28rem;
+  margin: 0 auto 0.9rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.6);
+}
+
 .map-selection-sheet--dark .map-selection-sheet__title {
   color: #f8fafc;
 }
@@ -690,6 +777,11 @@ onBeforeUnmount(() => {
   font-family: var(--ff-display);
   font-size: 1.05rem;
   line-height: 1.15;
+}
+
+.map-selection-sheet__actions {
+  display: grid;
+  gap: 0.65rem;
 }
 
 .map-sheet-enter-active,
@@ -743,21 +835,44 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 600px) {
+  .stations-map-shell {
+    padding: 0 0.85rem 0.85rem;
+  }
+
+  .stations-map {
+    min-height: 34rem;
+    border-radius: 24px;
+  }
+
   .stations-map__legend {
-    top: 0.8rem;
+    top: 3.9rem;
     left: 1.2rem;
     right: 1.2rem;
-    max-width: none;
+    max-width: 14rem;
+    padding: 0.65rem 0.7rem;
+    gap: 0.45rem;
   }
 
   .stations-map__credit {
     left: 1.2rem;
     right: auto;
-    bottom: 7.8rem;
+    bottom: 10.9rem;
+  }
+
+  .stations-map__mobile-tip {
+    bottom: 8rem;
   }
 
   .map-selection-sheet {
-    bottom: 1rem;
+    right: 0.85rem;
+    bottom: 0.85rem;
+    left: 0.85rem;
+    padding: 0.9rem;
+    border-radius: 22px;
+  }
+
+  .map-selection-sheet__actions :global(.v-btn) {
+    min-height: 2.9rem;
   }
 }
 </style>

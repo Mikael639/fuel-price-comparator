@@ -1,4 +1,5 @@
 import { fuelStations } from "@/data/stations";
+import { appConfig } from "@/config/app";
 import { fuelApiService, type ApiStationRecord, type DailyHistoryRecord } from "@/services/fuelApi";
 import { osmService } from "@/services/osmService";
 import type {
@@ -715,7 +716,7 @@ class StationService {
       return null;
     }
 
-    const focusRadiusKm = Math.min(radiusKm, 8);
+    const focusRadiusKm = Math.min(radiusKm, appConfig.stations.recommendedFocusRadiusKm);
     const localStations = comparableStations.filter((station) => station.distanceKm <= focusRadiusKm);
     return localStations[0] ?? comparableStations[0] ?? null;
   }

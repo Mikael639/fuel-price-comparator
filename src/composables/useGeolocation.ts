@@ -2,6 +2,7 @@ import type { Coordinates } from "@/types/station";
 
 type GeolocationErrorCode =
   | "denied"
+  | "insecure_context"
   | "unavailable"
   | "timeout"
   | "unsupported"
@@ -28,24 +29,24 @@ const mapGeolocationError = (error: GeolocationPositionError) => {
       return {
         code: "denied" as const,
         message:
-          "La géolocalisation a été refusée. Utilisez une position de démonstration ou recherchez votre ville manuellement.",
+          "La geolocalisation a ete refusee. Utilisez une position de demonstration ou recherchez votre ville manuellement.",
       };
     case error.POSITION_UNAVAILABLE:
       return {
         code: "unavailable" as const,
         message:
-          "La position est indisponible pour le moment. Réessayez ou utilisez une position de démonstration.",
+          "La position est indisponible pour le moment. Reessayez ou utilisez une position de demonstration.",
       };
     case error.TIMEOUT:
       return {
         code: "timeout" as const,
         message:
-          "La demande de géolocalisation a expiré. Réessayez ou passez par le mode démonstration.",
+          "La demande de geolocalisation a expire. Reessayez ou passez par le mode demonstration.",
       };
     default:
       return {
         code: "unknown" as const,
-        message: "Une erreur inattendue est survenue pendant la géolocalisation.",
+        message: "Une erreur inattendue est survenue pendant la geolocalisation.",
       };
   }
 };
@@ -59,7 +60,19 @@ export const useGeolocation = () => {
           error: {
             code: "unsupported",
             message:
-              "Votre navigateur ne prend pas en charge la géolocalisation. Utilisez la position de démonstration.",
+              "Votre navigateur ne prend pas en charge la geolocalisation. Utilisez la position de demonstration.",
+          },
+        });
+        return;
+      }
+
+      if (!window.isSecureContext) {
+        resolve({
+          ok: false,
+          error: {
+            code: "insecure_context",
+            message:
+              "La geolocalisation navigateur n'est disponible qu'en HTTPS. Ce site est actuellement servi en HTTP. Utilisez la recherche d'adresse, la position de demonstration, ou activez HTTPS avec un nom de domaine.",
           },
         });
         return;

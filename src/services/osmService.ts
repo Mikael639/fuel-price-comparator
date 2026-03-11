@@ -1,3 +1,4 @@
+import { appConfig } from "@/config/app";
 import { fetchJson } from "@/services/apiClient";
 
 interface OsmElement {
@@ -18,8 +19,6 @@ interface OsmElement {
 interface OverpassResponse {
   elements?: OsmElement[];
 }
-
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
 const buildBrandQuery = (lat: number, lng: number) => `
 [out:json][timeout:20];
@@ -46,13 +45,13 @@ class OsmService {
     }
 
     try {
-      const payload = await fetchJson<OverpassResponse>(OVERPASS_URL, {
+      const payload = await fetchJson<OverpassResponse>(appConfig.osm.overpassUrl, {
         method: "POST",
         headers: {
           "Content-Type": "text/plain;charset=UTF-8",
         },
         body: buildBrandQuery(lat, lng),
-        timeoutMs: 8_000,
+        timeoutMs: appConfig.osm.timeoutMs,
         errorMessage: "La source OSM compl\u00e9mentaire est indisponible.",
       });
 

@@ -1,4 +1,5 @@
 import type { Coordinates } from "@/types/station";
+import { appConfig } from "@/config/app";
 import { fetchJson } from "@/services/apiClient";
 
 export interface ApiStationRecord {
@@ -49,15 +50,6 @@ interface CacheEntry<T> {
   value: T;
 }
 
-const API_BASE_URL =
-  "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
-const DAILY_API_BASE_URL =
-  "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-carburants-quotidien/records";
-
-const STATIONS_CACHE_TTL_MS = 60 * 1000;
-const STATION_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
-const HISTORY_CACHE_TTL_MS = 30 * 60 * 1000;
-
 const stationSelect =
   "id,adresse,ville,cp,geom,services_service,horaires,horaires_jour,horaires_automate_24_24,sp95_prix,sp98_prix,gazole_prix,e85_prix,gplc_prix,e10_prix,carburants_disponibles,carburants_indisponibles";
 
@@ -68,7 +60,7 @@ const buildNearbyUrl = (position: Coordinates, radiusKm: number) => {
     where: `within_distance(geom, geom'POINT(${position.lng} ${position.lat})', ${radiusKm} km)`,
   });
 
-  return `${API_BASE_URL}?${params.toString()}`;
+  return `${appConfig.fuelApi.recordsUrl}?${params.toString()}`;
 };
 
 const buildStationByIdUrl = (id: string) => {
@@ -78,7 +70,7 @@ const buildStationByIdUrl = (id: string) => {
     where: `id=${id}`,
   });
 
-  return `${API_BASE_URL}?${params.toString()}`;
+  return `${appConfig.fuelApi.recordsUrl}?${params.toString()}`;
 };
 
 const buildDailyHistoryUrl = (id: string) => {
@@ -89,7 +81,7 @@ const buildDailyHistoryUrl = (id: string) => {
     order_by: "prix_maj desc",
   });
 
-  return `${DAILY_API_BASE_URL}?${params.toString()}`;
+  return `${appConfig.fuelApi.dailyHistoryUrl}?${params.toString()}`;
 };
 
 class FuelApiService {
@@ -134,12 +126,12 @@ class FuelApiService {
 
     const payload = await fetchJson<ApiRecordsResponse>(requestUrl, {
       signal: options?.signal,
-      timeoutMs: 10_000,
+      timeoutMs: appConfig.fuelApi.timeoutMs,
       errorMessage: "L'API officielle des carburants est indisponible.",
     });
 
     const results = payload.results ?? [];
-    this.setCachedValue(this.nearbyCache, requestUrl, results, STATIONS_CACHE_TTL_MS);
+    this.setCachedValue(this.nearbyCache, requestUrl, results, appConfig.fuelApi.nearbyCacheTtlMs);
     return results;
   }
 
@@ -153,12 +145,12 @@ class FuelApiService {
 
     const payload = await fetchJson<ApiRecordsResponse>(requestUrl, {
       signal: options?.signal,
-      timeoutMs: 10_000,
+      timeoutMs: appConfig.fuelApi.timeoutMs,
       errorMessage: "La station demand\u00e9e est indisponible dans l'API officielle.",
     });
 
     const result = payload.results?.[0] ?? null;
-    this.setCachedValue(this.stationByIdCache, requestUrl, result, STATION_DETAIL_CACHE_TTL_MS);
+    this.setCachedValue(this.stationByIdCache, requestUrl, result, appConfig.fuelApi.detailCacheTtlMs);
     return result;
   }
 
@@ -172,12 +164,12 @@ class FuelApiService {
 
     const payload = await fetchJson<DailyHistoryResponse>(requestUrl, {
       signal: options?.signal,
-      timeoutMs: 10_000,
+      timeoutMs: appConfig.fuelApi.timeoutMs,
       errorMessage: "L'historique officiel des prix est indisponible.",
     });
 
     const results = payload.results ?? [];
-    this.setCachedValue(this.dailyHistoryCache, requestUrl, results, HISTORY_CACHE_TTL_MS);
+    this.setCachedValue(this.dailyHistoryCache, requestUrl, results, appConfig.fuelApi.historyCacheTtlMs);
     return results;
   }
 }

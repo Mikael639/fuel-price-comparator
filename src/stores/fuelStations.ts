@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
+import { appConfig } from "@/config/app";
 import { useGeolocation } from "@/composables/useGeolocation";
 import { mockLocations } from "@/data/mockLocations";
 import { ApiServiceError } from "@/services/apiClient";
@@ -32,15 +33,12 @@ interface PersistedPreferences {
 }
 
 const STORAGE_KEY = "fuel-flash:preferences:v4";
-const STATION_RELOAD_DEBOUNCE_MS = 250;
-const GEOCODING_SEARCH_DEBOUNCE_MS = 300;
-
 const defaultPreferences: PersistedPreferences = {
   selectedFuel: "Diesel",
-  radiusKm: 10,
+  radiusKm: appConfig.stations.defaultRadiusKm,
   openOnly: false,
   selectedServices: [],
-  themeName: "fuelLight",
+  themeName: appConfig.theme.defaultTheme,
   manualLocationId: null,
   sortMode: "price",
   favoriteIds: [],
@@ -176,7 +174,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     stationReloadTimeoutId = globalThis.setTimeout(() => {
       stationReloadTimeoutId = null;
       void loadStationsForArea(position);
-    }, STATION_RELOAD_DEBOUNCE_MS);
+    }, appConfig.stations.reloadDebounceMs);
   });
 
   const applyLocation = (
@@ -387,7 +385,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       const abortController = new AbortController();
       activeSearchAbortController = abortController;
       void executeSearchLocations(trimmedQuery, requestId, abortController);
-    }, GEOCODING_SEARCH_DEBOUNCE_MS);
+    }, appConfig.geocoding.searchDebounceMs);
   };
 
   const selectSearchLocation = (result: GeocodingResult) => {

@@ -1,4 +1,5 @@
 import type { GeocodingResult } from "@/types/station";
+import { appConfig } from "@/config/app";
 import { fetchJson } from "@/services/apiClient";
 
 interface NominatimResult {
@@ -26,9 +27,6 @@ interface CacheEntry {
   results: GeocodingResult[];
 }
 
-const GEOCODING_URL = "https://nominatim.openstreetmap.org/search";
-const GEOCODING_CACHE_TTL_MS = 30 * 60 * 1000;
-
 const buildGeocodingUrl = (query: string) => {
   const params = new URLSearchParams({
     format: "jsonv2",
@@ -39,7 +37,7 @@ const buildGeocodingUrl = (query: string) => {
     q: query,
   });
 
-  return `${GEOCODING_URL}?${params.toString()}`;
+  return `${appConfig.geocoding.url}?${params.toString()}`;
 };
 
 const toResult = (record: NominatimResult): GeocodingResult => {
@@ -95,13 +93,13 @@ class GeocodingService {
 
     const payload = await fetchJson<NominatimResult[]>(buildGeocodingUrl(trimmedQuery), {
       signal: options?.signal,
-      timeoutMs: 8_000,
+      timeoutMs: appConfig.geocoding.timeoutMs,
       errorMessage: "Le g\u00e9ocodage est indisponible pour le moment.",
     });
 
     const results = payload.map(toResult);
     this.searchCache.set(cacheKey, {
-      expiresAt: Date.now() + GEOCODING_CACHE_TTL_MS,
+      expiresAt: Date.now() + appConfig.geocoding.cacheTtlMs,
       results,
     });
 
