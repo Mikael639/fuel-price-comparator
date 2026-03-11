@@ -9,13 +9,13 @@ import StationsMap from "@/components/map/StationsMap.vue";
 import BestStationCard from "@/components/station/BestStationCard.vue";
 import StationCard from "@/components/station/StationCard.vue";
 import StationStats from "@/components/station/StationStats.vue";
+import { useStationsBootstrap } from "@/composables/useStationsBootstrap";
 import { mockLocations } from "@/data/mockLocations";
 import { stationService } from "@/services/stationService";
 import { FUEL_TYPES } from "@/types/station";
 import { sortModeCopy } from "@/utils/format";
-import { useFuelStationsStore } from "@/stores/fuelStations";
 
-const stationStore = useFuelStationsStore();
+const stationStore = useStationsBootstrap();
 const {
   userPosition,
   locationLabel,
@@ -50,8 +50,8 @@ const hasHydratedView = ref(false);
 
 const savingsHero = computed(() =>
   stats.value.maxSavings != null && bestStation.value
-    ? `Jusqu'à ${stats.value.maxSavings.toFixed(2).replace(".", ",")} € d'économie par litre sur ${selectedFuel.value}.`
-    : "Affinez vos filtres pour faire ressortir l'offre la plus intéressante autour de vous.",
+    ? `Jusqu'a ${stats.value.maxSavings.toFixed(2).replace(".", ",")} EUR d'economie par litre sur ${selectedFuel.value}.`
+    : "Affinez vos filtres pour faire ressortir l'offre la plus interessante autour de vous.",
 );
 
 const absoluteCheapestStation = computed(() => stationService.getAbsoluteCheapestStation(nearbyStations.value));
@@ -63,13 +63,11 @@ const mapStatusCopy = computed(() => {
 
   switch (locationSource.value) {
     case "browser":
-      return "Carte recentrée sur votre position actuelle";
+      return "Carte recentree sur votre position actuelle";
     case "manual":
-      return `Carte centrée sur ${locationLabel.value}`;
     case "demo":
-      return `Carte centrée sur ${locationLabel.value}`;
     case "search":
-      return `Carte centrée sur ${locationLabel.value}`;
+      return `Carte centree sur ${locationLabel.value}`;
     default:
       return null;
   }
@@ -80,7 +78,7 @@ const geolocationHint = computed(() => {
     return null;
   }
 
-  return "La géolocalisation navigateur peut être approximative. Si la carte semble décalée, recherchez votre ville manuellement.";
+  return "La geolocalisation navigateur peut etre approximative. Si la carte semble decalee, recherchez votre ville manuellement.";
 });
 
 const sourceHint = computed(() => {
@@ -88,7 +86,7 @@ const sourceHint = computed(() => {
     return null;
   }
 
-  return "Données live DGCCRF via prix-carburants.gouv.fr. Les enseignes peuvent être estimées ou enrichies ponctuellement via OpenStreetMap quand la source officielle ne les fournit pas.";
+  return "Donnees live DGCCRF via prix-carburants.gouv.fr. Les enseignes peuvent etre estimees ou enrichies ponctuellement via OpenStreetMap.";
 });
 
 const distanceFocusHint = computed(() => {
@@ -100,9 +98,9 @@ const distanceFocusHint = computed(() => {
     return null;
   }
 
-  return `Le tarif absolu le plus bas du rayon est à ${absoluteCheapestStation.value.distanceKm
+  return `Le tarif absolu le plus bas du rayon est a ${absoluteCheapestStation.value.distanceKm
     .toFixed(1)
-    .replace(".", ",")} km. La recommandation met en avant une station plus proche pour rester pertinente localement.`;
+    .replace(".", ",")} km. La recommandation privilegie une station plus proche pour rester pertinente localement.`;
 });
 
 const favoritesSummary = computed(() => {
@@ -113,9 +111,24 @@ const favoritesSummary = computed(() => {
   return `${favoriteStations.value.length} station(s) favorite(s) dans le rayon courant`;
 });
 
-onMounted(() => {
-  void stationStore.initialize();
+const discoveryCards = [
+  {
+    title: "Tendances locales",
+    subtitle: "Graphique 7 jours, ecarts hebdomadaires et comparaison Diesel / Essence.",
+    icon: "mdi-chart-line",
+    to: { name: "insights" },
+    cta: "Ouvrir les tendances",
+  },
+  {
+    title: "Vue Europe",
+    subtitle: "Lecture multi-pays pour prendre du recul sans alourdir l'accueil.",
+    icon: "mdi-earth",
+    to: { name: "europe" },
+    cta: "Voir l'Europe",
+  },
+];
 
+onMounted(() => {
   setTimeout(() => {
     hasHydratedView.value = true;
   }, 0);
@@ -133,7 +146,7 @@ watch(
     }
 
     mapSnackbarMessage.value =
-      source === "browser" ? "Carte recentrée sur votre position actuelle." : `Carte centrée sur ${label}.`;
+      source === "browser" ? "Carte recentree sur votre position actuelle." : `Carte centree sur ${label}.`;
     isMapSnackbarVisible.value = true;
   },
 );
@@ -149,9 +162,9 @@ watch(
             md="8"
           >
             <SectionHeading
-              eyebrow="Prototype mobile-first"
-              subtitle="Comparez instantanément les prix SP95, SP98, Diesel, E85 et GPL autour de votre position. L'interface met en avant le meilleur prix, la carte interactive, les favorites et l'économie locale potentielle."
-              title="Le comparateur carburants qui va droit au point"
+              eyebrow="Recherche locale"
+              subtitle="Comparez instantanement les prix SP95, SP98, Diesel, E85 et GPL autour de votre position. Cette page reste centree sur la recherche, la carte et la meilleure recommandation."
+              title="Trouvez vite la meilleure station autour de vous"
             />
           </v-col>
 
@@ -342,7 +355,7 @@ watch(
         <div class="d-flex flex-column flex-md-row justify-space-between align-start align-md-end ga-3 mb-4">
           <SectionHeading
             eyebrow="Favorites"
-            subtitle="Retrouvez rapidement vos stations enregistrées dans la zone visible."
+            subtitle="Retrouvez rapidement vos stations enregistrees dans la zone visible."
             title="Vos stations favorites"
           />
         </div>
@@ -388,14 +401,65 @@ watch(
         />
       </section>
 
+      <section class="mb-6 mb-md-8">
+        <div class="d-flex flex-column flex-md-row justify-space-between align-start align-md-end ga-3 mb-4">
+          <SectionHeading
+            eyebrow="Analyses"
+            subtitle="Les vues tendances et Europe sont separees pour garder l'accueil simple, rapide a lire et plus confortable sur mobile."
+            title="Approfondir sans surcharger"
+          />
+        </div>
+
+        <v-row>
+          <v-col
+            v-for="card in discoveryCards"
+            :key="card.title"
+            cols="12"
+            md="6"
+          >
+            <v-card
+              class="discovery-card pa-4 pa-md-5"
+              :to="card.to"
+            >
+              <div class="d-flex align-start justify-space-between ga-3 mb-4">
+                <div>
+                  <p class="text-overline mb-1">{{ card.title }}</p>
+                  <h3 class="text-h6 mb-2">{{ card.title }}</h3>
+                  <p class="text-body-2 text-medium-emphasis mb-0">
+                    {{ card.subtitle }}
+                  </p>
+                </div>
+
+                <v-avatar
+                  class="discovery-card__icon"
+                  size="42"
+                >
+                  <v-icon
+                    :icon="card.icon"
+                    size="22"
+                  />
+                </v-avatar>
+              </div>
+
+              <v-btn
+                color="secondary"
+                variant="tonal"
+              >
+                {{ card.cta }}
+              </v-btn>
+            </v-card>
+          </v-col>
+        </v-row>
+      </section>
+
       <section
         v-if="userPosition && !hasResults"
         class="mb-6 mb-md-8"
       >
         <EmptyStateCard
-          description="Aucune station n'apparaît avec le rayon et les filtres actuels. Élargissez le rayon ou retirez quelques services."
+          description="Aucune station n'apparait avec le rayon et les filtres actuels. Elargissez le rayon ou retirez quelques services."
           icon="mdi-map-marker-remove-outline"
-          title="Aucun résultat dans le rayon"
+          title="Aucun resultat dans le rayon"
         />
       </section>
 
@@ -404,7 +468,7 @@ watch(
         class="mb-6 mb-md-8"
       >
         <EmptyStateCard
-          description="Des stations existent dans cette zone, mais aucune ne propose actuellement le carburant sélectionné."
+          description="Des stations existent dans cette zone, mais aucune ne propose actuellement le carburant selectionne."
           icon="mdi-fuel-off"
           title="Carburant indisponible"
         />
@@ -417,7 +481,7 @@ watch(
         <div class="d-flex flex-column flex-md-row justify-space-between align-start align-md-end ga-3 mb-4">
           <SectionHeading
             eyebrow="Classement"
-            :subtitle="`Les stations sont triées par ${sortModeCopy[sortMode].toLocaleLowerCase('fr-FR')} dans le rayon courant.`"
+            :subtitle="`Les stations sont triees par ${sortModeCopy[sortMode].toLocaleLowerCase('fr-FR')} dans le rayon courant.`"
             title="Liste des stations"
           />
           <v-chip
@@ -451,9 +515,9 @@ watch(
         class="mb-6"
       >
         <EmptyStateCard
-          description="Le prototype n'a pas pu charger les données officielles ni le jeu de secours local."
+          description="Impossible de charger les donnees officielles et le jeu de secours local."
           icon="mdi-database-off-outline"
-          title="Données indisponibles"
+          title="Donnees indisponibles"
         />
       </section>
     </template>
@@ -507,11 +571,40 @@ watch(
   font-size: 0.9rem;
 }
 
+.discovery-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.82), rgba(240, 249, 255, 0.72)),
+    rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-soft);
+}
+
+.discovery-card__icon {
+  flex-shrink: 0;
+  color: rgb(var(--v-theme-secondary));
+  background: rgba(15, 118, 110, 0.1);
+}
+
 .v-theme--fuelDark .hero-card {
   background:
     radial-gradient(circle at top right, rgba(255, 209, 102, 0.18), transparent 28%),
     linear-gradient(135deg, rgba(94, 234, 212, 0.12), rgba(125, 211, 252, 0.08)),
     rgba(13, 31, 39, 0.72);
   border-color: rgba(148, 163, 184, 0.08);
+}
+
+.v-theme--fuelDark .discovery-card {
+  background:
+    linear-gradient(155deg, rgba(13, 31, 39, 0.88), rgba(12, 74, 110, 0.34)),
+    rgba(13, 31, 39, 0.8);
+  border-color: rgba(148, 163, 184, 0.08);
+}
+
+.v-theme--fuelDark .discovery-card__icon {
+  background: rgba(94, 234, 212, 0.12);
 }
 </style>

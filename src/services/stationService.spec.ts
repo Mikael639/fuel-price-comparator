@@ -125,4 +125,37 @@ describe("stationService helpers", () => {
 
     expect(stationService.getStationFillSavings(station, 1.77)).toBeCloseTo(3.5);
   });
+
+  it("aggregates a weekly local trend for a fuel", () => {
+    const station: StationWithMetrics = {
+      ...baseStation,
+      distanceKm: 4,
+      selectedFuelPrice: 1.7,
+      estimatedDriveMinutes: 9,
+      savingsPerLiter: 0.07,
+      isFavorite: false,
+    };
+
+    const trend = stationService.getAreaWeeklyFuelTrend([station], "Diesel");
+
+    expect(trend.labels.length).toBeGreaterThanOrEqual(2);
+    expect(trend.latestPrice).toBe(1.7);
+  });
+
+  it("compares diesel and essence averages in the visible area", () => {
+    const station: StationWithMetrics = {
+      ...baseStation,
+      distanceKm: 4,
+      selectedFuelPrice: 1.7,
+      estimatedDriveMinutes: 9,
+      savingsPerLiter: 0.07,
+      isFavorite: false,
+    };
+
+    const comparison = stationService.getDieselEssenceComparator([station]);
+
+    expect(comparison.dieselAverage).toBe(1.7);
+    expect(comparison.gasolineAverage).toBe(1.8);
+    expect(comparison.cheaperFuel).toBe("Diesel");
+  });
 });

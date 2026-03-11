@@ -37,6 +37,12 @@ interface ParsedOpeningHours {
   jour?: ParsedOpeningDay[] | ParsedOpeningDay;
 }
 
+interface FuelComparisonEntry {
+  fuel: FuelType;
+  averagePrice: number | null;
+  stationCount: number;
+}
+
 const FUEL_TO_API_FIELD: Record<FuelType, keyof ApiStationRecord> = {
   SP95: "sp95_prix",
   SP98: "sp98_prix",
@@ -754,6 +760,124 @@ class StationService {
     }
 
     return savingsPerLiter * liters;
+  }
+
+  getAreaWeeklyFuelTrend(stations: StationWithMetrics[], fuel: FuelType) {
+    const groupedPrices = new Map<string, number[]>();
+
+    stations.forEach((station) => {
+      const history = station.priceHistory[fuel] ?? [];
+
+      history.forEach((point) => {
+        const dayKey = point.date.slice(0, 10);
+        const currentValues = groupedPrices.get(dayKey) ?? [];
+        currentValues.push(point.price);
+        groupedPrices.set(dayKey, currentValues);
+      });
+    });
+
+    const labels = [...groupedPrices.keys()].sort().slice(-7);
+    const prices = labels.map((label) => {
+      const values = groupedPrices.get(label) ?? [];
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    });
+
+    return {
+      labels,
+      prices,
+      latestPrice: prices[prices.length - 1] ?? null,
+      seriesCount: stations.filter((station) => (station.priceHistory[fuel] ?? []).length > 0).length,
+    };
+  }
+
+  getPriceTrendFromSeries(prices: number[]): PriceTrend {
+    if (prices.length < 2) {
+      return "stable";
+    }
+
+    const first = prices[0] ?? prices[prices.length - 1] ?? 0;
+    const last = prices[prices.length - 1] ?? first;
+    const delta = last - first;
+
+    if (delta > 0.01) {
+      return "up";
+    }
+
+    if (delta < -0.01) {
+      return "down";
+    }
+
+    return "stable";
+  }
+
+  getAreaFuelComparison(stations: StationWithMetrics[]): FuelComparisonEntry[] {
+    return ["Diesel", "SP95", "SP98", "E85", "GPL"].map((fuel) => {
+      const prices = stations
+        .map((station) => station.fuelPrices[fuel as FuelType] ?? null)
+        .filter((price): price is number => price != null);
+
+      return {
+        fuel: fuel as FuelType,
+        averagePrice:
+          prices.length > 0 ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null,
+        stationCount: prices.length,
+      };
+    });
+  }
+
+  getDieselEssenceComparator(stations: StationWithMetrics[]) {
+    const comparison = this.getAreaFuelComparison(stations);
+    const dieselAverage = comparison.find((entry) => entry.fuel === "Diesel")?.averagePrice ?? null;
+    const gasolineCandidates = comparison
+      .filter((entry) => entry.fuel === "SP95" || entry.fuel === "SP98")
+      .map((entry) => entry.averagePrice)
+      .filter((price): price is number => price != null);
+
+    const gasolineAverage =
+      gasolineCandidates.length > 0
+        ? gasolineCandidates.reduce((sum, price) => sum + price, 0) / gasolineCandidates.length
+        : null;
+
+    return {
+      dieselAverage,
+      gasolineAverage,
+      gapPerLiter:
+        dieselAverage != null && gasolineAverage != null ? Math.abs(gasolineAverage - dieselAverage) : null,
+      cheaperFuel:
+        dieselAverage == null || gasolineAverage == null
+          ? null
+          : dieselAverage < gasolineAverage
+            ? "Diesel"
+            : "Essence",
+    };
+  }
+
+  getEuropeDieselEssenceComparator(market: {
+    snapshots: Array<{ prices: Partial<Record<FuelType, number>> }>;
+  }) {
+    const latestSnapshot = market.snapshots[market.snapshots.length - 1];
+    const dieselAverage = latestSnapshot?.prices.Diesel ?? null;
+    const gasolineCandidates = [latestSnapshot?.prices.SP95 ?? null, latestSnapshot?.prices.SP98 ?? null].filter(
+      (price): price is number => price != null,
+    );
+
+    const gasolineAverage =
+      gasolineCandidates.length > 0
+        ? gasolineCandidates.reduce((sum, price) => sum + price, 0) / gasolineCandidates.length
+        : null;
+
+    return {
+      dieselAverage,
+      gasolineAverage,
+      gapPerLiter:
+        dieselAverage != null && gasolineAverage != null ? Math.abs(gasolineAverage - dieselAverage) : null,
+      cheaperFuel:
+        dieselAverage == null || gasolineAverage == null
+          ? null
+          : dieselAverage < gasolineAverage
+            ? "Diesel"
+            : "Essence",
+    };
   }
 
   getStats(stations: StationWithMetrics[]): StationStats {

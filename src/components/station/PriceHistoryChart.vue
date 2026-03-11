@@ -83,9 +83,9 @@ const chartOptions = computed<ChartOptions<"line">>(() => ({
     <div class="d-flex flex-column flex-md-row align-start align-md-center justify-space-between ga-3 mb-5">
       <div>
         <p class="text-overline mb-1">Historique officiel</p>
-        <h3 class="text-h6 section-title mb-1">Évolution du prix {{ fuel }}</h3>
+        <h3 class="text-h6 section-title mb-1">Evolution du prix {{ fuel }}</h3>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          {{ history.length }} relevé(s) disponible(s) • Tendance : {{ trendCopy[trend] }}
+          {{ history.length }} releve(s) disponible(s) - Tendance : {{ trendCopy[trend] }}
         </p>
       </div>
       <v-chip
