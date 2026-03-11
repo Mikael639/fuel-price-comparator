@@ -1,15 +1,9 @@
 import { fileURLToPath, URL } from "node:url";
-import vue from "@vitejs/plugin-vue";
-import vuetify from "vite-plugin-vuetify";
-import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [
-    vue(),
-    vuetify({
-      autoImport: true,
-    }),
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

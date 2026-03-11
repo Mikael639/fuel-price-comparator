@@ -10,7 +10,7 @@ export const mockLocations: MockLocation[] = [
   },
   {
     id: "republique",
-    label: "Place de la République",
+    label: "Place de la Republique",
     city: "Paris 11e",
     lat: 48.867,
     lng: 2.3639,
@@ -24,14 +24,14 @@ export const mockLocations: MockLocation[] = [
   },
   {
     id: "la-defense",
-    label: "La Défense",
+    label: "La Defense",
     city: "Puteaux",
     lat: 48.8919,
     lng: 2.2384,
   },
   {
     id: "vincennes",
-    label: "Château de Vincennes",
+    label: "Chateau de Vincennes",
     city: "Vincennes",
     lat: 48.8446,
     lng: 2.4362,

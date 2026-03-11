@@ -55,7 +55,7 @@ describe("stationService helpers", () => {
     });
 
     expect(station?.city).toBe("Juvisy-sur-Orge");
-    expect(station?.services).toContain("Supérette");
+    expect(station?.services).toContain("Superette");
     expect(station?.fuelPrices.Diesel).toBe(1.7);
   });
 

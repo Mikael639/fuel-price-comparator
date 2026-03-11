@@ -68,14 +68,13 @@ test.beforeEach(async ({ page }) => {
 test("can select a manual location and open a station detail", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("combobox", { name: "Ville de démonstration" }).click();
-  await page.getByRole("option", { name: "Juvisy-sur-Orge Centre" }).click();
+  await page.locator("select").first().selectOption("juvisy");
 
   await expect(page.getByText("Vos stations favorites")).toHaveCount(0);
   await expect(page.getByText("Liste des stations")).toBeVisible();
   await expect(page.getByRole("heading", { name: /Station Juvisy-sur-Orge/ }).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Voir détails" }).first().click();
+  await page.getByRole("button", { name: "Voir details" }).first().click();
 
   await expect(page).toHaveURL(/\/station\//);
   await expect(page.getByText("Historique officiel")).toBeVisible();

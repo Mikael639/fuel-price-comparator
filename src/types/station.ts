@@ -1,6 +1,6 @@
 export const FUEL_TYPES = ["SP95", "SP98", "Diesel", "E85", "GPL"] as const;
 export const SERVICE_TYPES = [
-  "Supérette",
+  "Superette",
   "Lavage",
   "Gonflage",
   "Toilettes",
