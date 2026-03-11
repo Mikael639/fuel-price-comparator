@@ -20,12 +20,9 @@ const toggleTheme = () => {
 </script>
 
 <template>
-  <v-app-bar
-    class="header-bar"
-    flat
-  >
-    <v-container class="header-bar__inner py-3">
-      <div class="d-flex align-center ga-3">
+  <header class="header-shell">
+    <div class="header-shell__surface">
+      <v-container class="header-bar py-3">
         <router-link
           class="header-bar__brand"
           :to="{ name: 'home' }"
@@ -46,10 +43,8 @@ const toggleTheme = () => {
             <h1 class="header-bar__title">FuelFlash</h1>
           </div>
         </router-link>
-      </div>
 
-      <div class="header-bar__actions">
-        <nav class="header-bar__nav">
+        <nav class="header-bar__nav header-bar__nav--desktop">
           <v-btn
             v-for="item in navigationItems"
             :key="item.label"
@@ -70,22 +65,52 @@ const toggleTheme = () => {
           variant="tonal"
           @click="toggleTheme"
         />
-      </div>
-    </v-container>
-  </v-app-bar>
+      </v-container>
+    </div>
+
+    <div class="header-shell__mobile-nav-wrap">
+      <v-container class="header-shell__mobile-nav py-2">
+        <nav class="header-bar__nav header-bar__nav--mobile">
+          <v-btn
+            v-for="item in navigationItems"
+            :key="`mobile-${item.label}`"
+            class="header-bar__nav-link header-bar__nav-link--mobile"
+            :color="activeRouteName === String(item.to.name) ? 'secondary' : undefined"
+            :prepend-icon="item.icon"
+            :to="item.to"
+            :variant="activeRouteName === String(item.to.name) ? 'flat' : 'text'"
+          >
+            {{ item.label }}
+          </v-btn>
+        </nav>
+      </v-container>
+    </div>
+  </header>
 </template>
 
 <style scoped>
-.header-bar {
+.header-shell {
   position: sticky;
   top: 0;
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.7);
+  z-index: 20;
+}
+
+.header-shell__surface,
+.header-shell__mobile-nav-wrap {
   backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.header-shell__surface {
   border-bottom: 1px solid rgba(15, 23, 42, 0.05);
 }
 
-.header-bar__inner {
+.header-shell__mobile-nav-wrap {
+  display: none;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.header-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -96,11 +121,13 @@ const toggleTheme = () => {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
   color: inherit;
   text-decoration: none;
 }
 
 .header-bar__badge {
+  flex-shrink: 0;
   background: linear-gradient(135deg, rgb(var(--v-theme-primary)), rgb(var(--v-theme-info)));
   box-shadow: 0 12px 30px rgba(15, 118, 110, 0.25);
 }
@@ -120,12 +147,6 @@ const toggleTheme = () => {
   color: rgb(var(--v-theme-on-surface));
 }
 
-.header-bar__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 .header-bar__nav {
   display: flex;
   align-items: center;
@@ -134,6 +155,10 @@ const toggleTheme = () => {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.header-bar__nav--desktop {
+  margin-left: auto;
 }
 
 .header-bar__nav-link {
@@ -145,11 +170,13 @@ const toggleTheme = () => {
 }
 
 .header-bar__theme {
+  flex-shrink: 0;
   backdrop-filter: blur(12px);
 }
 
-.v-theme--fuelDark .header-bar {
-  background: rgba(13, 31, 39, 0.68);
+.v-theme--fuelDark .header-shell__surface,
+.v-theme--fuelDark .header-shell__mobile-nav-wrap {
+  background: rgba(13, 31, 39, 0.78);
   border-color: rgba(148, 163, 184, 0.08);
 }
 
@@ -164,39 +191,33 @@ const toggleTheme = () => {
 
 @media (max-width: 720px) {
   .header-bar {
-    height: auto !important;
+    gap: 0.75rem;
   }
 
-  .header-bar__inner {
-    flex-wrap: wrap;
-    gap: 0.85rem;
+  .header-bar__nav--desktop {
+    display: none;
   }
 
-  .header-bar__actions {
-    width: 100%;
-    align-items: stretch;
-    justify-content: space-between;
+  .header-shell__mobile-nav-wrap {
+    display: block;
   }
 
-  .header-bar__nav {
-    flex: 1;
+  .header-shell__mobile-nav {
+    padding-top: 0.4rem;
+    padding-bottom: 0.6rem;
+  }
+
+  .header-bar__nav--mobile {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.4rem;
-    padding: 0.35rem;
+    gap: 0.35rem;
     border-radius: 20px;
-    overflow: visible;
   }
 
-  .header-bar__nav-link {
+  .header-bar__nav-link--mobile {
     min-height: 3rem;
-    padding-inline: 0.5rem;
-    font-size: 0.84rem;
-  }
-
-  .header-bar__theme {
-    flex-shrink: 0;
-    align-self: center;
+    padding-inline: 0.35rem;
+    font-size: 0.82rem;
   }
 
   .header-bar__eyebrow {
@@ -218,22 +239,9 @@ const toggleTheme = () => {
     height: 40px !important;
   }
 
-  .header-bar__actions {
-    flex-direction: column-reverse;
-    align-items: stretch;
-  }
-
-  .header-bar__nav {
-    width: 100%;
-  }
-
-  .header-bar__theme {
-    align-self: flex-end;
-  }
-
-  .header-bar__nav-link {
-    min-height: 3.2rem;
-    font-size: 0.78rem;
+  .header-bar__nav-link--mobile {
+    min-height: 3.1rem;
+    font-size: 0.76rem;
   }
 }
 </style>
