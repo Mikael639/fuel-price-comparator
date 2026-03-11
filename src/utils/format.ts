@@ -16,13 +16,16 @@ const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
 });
 
 export const formatPrice = (price: number | null | undefined) =>
-  price == null ? "Indisponible" : `${priceFormatter.format(price)} €/L`;
+  price == null ? "Indisponible" : `${priceFormatter.format(price)} \u20ac/L`;
 
 export const formatDistance = (distanceKm: number) =>
   distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${numberFormatter.format(distanceKm)} km`;
 
 export const formatMoney = (amount: number | null | undefined) =>
-  amount == null ? "0,00 €" : `${amount.toFixed(2).replace(".", ",")} €`;
+  amount == null ? "0,00 \u20ac" : `${amount.toFixed(2).replace(".", ",")} \u20ac`;
+
+export const formatFuelFillCost = (pricePerLiter: number | null | undefined, liters = 50) =>
+  pricePerLiter == null ? "Plein indisponible" : `${formatMoney(pricePerLiter * liters)} pour ${liters}L`;
 
 export const formatDateLabel = (value: string) => dateFormatter.format(new Date(value));
 
@@ -38,6 +41,6 @@ export const trendCopy: Record<PriceTrend, string> = {
 export const sortModeCopy: Record<SortMode, string> = {
   price: "Prix",
   distance: "Distance",
-  savings: "Économies",
+  savings: "\u00c9conomies",
   favorites: "Favoris d'abord",
 };

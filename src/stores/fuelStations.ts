@@ -2,10 +2,11 @@ import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { useGeolocation } from "@/composables/useGeolocation";
 import { mockLocations } from "@/data/mockLocations";
+import { ApiServiceError } from "@/services/apiClient";
 import { geocodingService } from "@/services/geocodingService";
 import { stationService } from "@/services/stationService";
-import { loadStorage, saveStorage } from "@/utils/storage";
 import { haversineDistance } from "@/utils/geo";
+import { loadStorage, saveStorage } from "@/utils/storage";
 import type {
   Coordinates,
   FuelStation,
@@ -31,6 +32,8 @@ interface PersistedPreferences {
 }
 
 const STORAGE_KEY = "fuel-flash:preferences:v4";
+const STATION_RELOAD_DEBOUNCE_MS = 250;
+const GEOCODING_SEARCH_DEBOUNCE_MS = 300;
 
 const defaultPreferences: PersistedPreferences = {
   selectedFuel: "Diesel",
@@ -52,6 +55,8 @@ const toCoordinates = (location: PersistedLocation | null): Coordinates | null =
         label: location.label,
       }
     : null;
+
+const isAbortError = (error: unknown) => error instanceof ApiServiceError && error.code === "aborted";
 
 export const useFuelStationsStore = defineStore("fuel-stations", () => {
   const persistedPreferences = loadStorage<PersistedPreferences>(STORAGE_KEY, defaultPreferences);
@@ -78,6 +83,13 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
   const locationPlaceId = ref<string | null>(persistedLocation?.placeId ?? null);
   const searchQuery = ref("");
   const geocodingResults = ref<GeocodingResult[]>([]);
+
+  let activeLoadAbortController: AbortController | null = null;
+  let activeLoadRequestId = 0;
+  let stationReloadTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let activeSearchAbortController: AbortController | null = null;
+  let activeSearchRequestId = 0;
+  let geocodingSearchTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const locationLabel = computed(() => userPosition.value?.label ?? null);
 
@@ -152,9 +164,19 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
   );
 
   watch(radiusKm, () => {
-    if (userPosition.value) {
-      void loadStationsForArea(userPosition.value);
+    if (!userPosition.value) {
+      return;
     }
+
+    if (stationReloadTimeoutId != null) {
+      globalThis.clearTimeout(stationReloadTimeoutId);
+    }
+
+    const position = userPosition.value;
+    stationReloadTimeoutId = globalThis.setTimeout(() => {
+      stationReloadTimeoutId = null;
+      void loadStationsForArea(position);
+    }, STATION_RELOAD_DEBOUNCE_MS);
   });
 
   const applyLocation = (
@@ -205,26 +227,43 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
   };
 
   const loadStationsForArea = async (position: Coordinates) => {
+    const requestId = ++activeLoadRequestId;
+    activeLoadAbortController?.abort();
+    activeLoadAbortController = new AbortController();
     isLoading.value = true;
     genericError.value = null;
 
     try {
-      stations.value = await stationService.getStationsAround(position, radiusKm.value);
+      const nextStations = await stationService.getStationsAround(position, radiusKm.value, {
+        signal: activeLoadAbortController.signal,
+      });
+
+      if (requestId !== activeLoadRequestId) {
+        return;
+      }
+
+      stations.value = nextStations;
 
       if (stations.value.length === 0) {
-        genericError.value =
-          "Aucune station n'a été retournée par l'API officielle dans cette zone.";
+        genericError.value = "Aucune station n'a \u00e9t\u00e9 retourn\u00e9e par l'API officielle dans cette zone.";
       } else {
         void enrichNearestBrands(position);
       }
     } catch (error) {
+      if (isAbortError(error) || requestId !== activeLoadRequestId) {
+        return;
+      }
+
       stations.value = stationService.getMockStations();
       genericError.value =
         error instanceof Error
           ? `${error.message} Affichage du dataset local de secours.`
           : "L'API officielle des carburants est indisponible. Affichage du dataset local de secours.";
     } finally {
-      isLoading.value = false;
+      if (requestId === activeLoadRequestId) {
+        isLoading.value = false;
+        activeLoadAbortController = null;
+      }
     }
   };
 
@@ -247,7 +286,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     }
 
     geoError.value = userPosition.value
-      ? `${result.error.message} La dernière position affichée a été conservée.`
+      ? `${result.error.message} La derni\u00e8re position affich\u00e9e a \u00e9t\u00e9 conserv\u00e9e.`
       : result.error.message;
     locationDenied.value = result.error.code === "denied";
   };
@@ -257,7 +296,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     const coordinates = {
       lat: demoLocation.lat,
       lng: demoLocation.lng,
-      label: `Position de démonstration • ${demoLocation.label}`,
+      label: `Position de d\u00e9monstration - ${demoLocation.label}`,
     };
 
     locationDenied.value = false;
@@ -278,7 +317,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     const coordinates = {
       lat: location.lat,
       lng: location.lng,
-      label: `${location.label} • ${location.city}`,
+      label: `${location.label} - ${location.city}`,
     };
 
     locationDenied.value = false;
@@ -288,30 +327,67 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     void loadStationsForArea(coordinates);
   };
 
-  const searchLocations = async (query: string) => {
+  const executeSearchLocations = async (query: string, requestId: number, abortController: AbortController) => {
+    try {
+      const results = await geocodingService.search(query, {
+        signal: abortController.signal,
+      });
+
+      if (requestId !== activeSearchRequestId) {
+        return;
+      }
+
+      geocodingResults.value = results;
+
+      if (results.length === 0) {
+        geocodingError.value = "Aucun r\u00e9sultat de g\u00e9ocodage n'a \u00e9t\u00e9 trouv\u00e9 pour cette recherche.";
+      }
+    } catch (error) {
+      if (isAbortError(error) || requestId !== activeSearchRequestId) {
+        return;
+      }
+
+      geocodingResults.value = [];
+      geocodingError.value =
+        error instanceof Error ? error.message : "Le g\u00e9ocodage est indisponible pour le moment.";
+    } finally {
+      if (requestId === activeSearchRequestId) {
+        isSearchingLocation.value = false;
+        activeSearchAbortController = null;
+      }
+    }
+  };
+
+  const searchLocations = (query: string) => {
     searchQuery.value = query;
     geocodingError.value = null;
 
-    if (!query.trim()) {
+    if (geocodingSearchTimeoutId != null) {
+      globalThis.clearTimeout(geocodingSearchTimeoutId);
+      geocodingSearchTimeoutId = null;
+    }
+
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      activeSearchRequestId += 1;
+      activeSearchAbortController?.abort();
+      activeSearchAbortController = null;
       geocodingResults.value = [];
+      isSearchingLocation.value = false;
       return;
     }
 
     isSearchingLocation.value = true;
+    const requestId = ++activeSearchRequestId;
 
-    try {
-      geocodingResults.value = await geocodingService.search(query);
-
-      if (geocodingResults.value.length === 0) {
-        geocodingError.value = "Aucun résultat de géocodage n'a été trouvé pour cette recherche.";
-      }
-    } catch (error) {
-      geocodingResults.value = [];
-      geocodingError.value =
-        error instanceof Error ? error.message : "Le géocodage est indisponible pour le moment.";
-    } finally {
-      isSearchingLocation.value = false;
-    }
+    geocodingSearchTimeoutId = globalThis.setTimeout(() => {
+      geocodingSearchTimeoutId = null;
+      activeSearchAbortController?.abort();
+      const abortController = new AbortController();
+      activeSearchAbortController = abortController;
+      void executeSearchLocations(trimmedQuery, requestId, abortController);
+    }, GEOCODING_SEARCH_DEBOUNCE_MS);
   };
 
   const selectSearchLocation = (result: GeocodingResult) => {

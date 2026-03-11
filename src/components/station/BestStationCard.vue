@@ -3,7 +3,13 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { stationService } from "@/services/stationService";
 import { useFuelStationsStore } from "@/stores/fuelStations";
-import { formatDistance, formatDriveTime, formatMoney, formatPrice } from "@/utils/format";
+import {
+  formatDistance,
+  formatDriveTime,
+  formatFuelFillCost,
+  formatMoney,
+  formatPrice,
+} from "@/utils/format";
 import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import type { FuelType, StationWithMetrics } from "@/types/station";
 
@@ -17,6 +23,7 @@ const router = useRouter();
 const stationStore = useFuelStationsStore();
 
 const savings = computed(() => stationService.getStationSavings(props.station, props.averagePrice));
+const fillSavings = computed(() => stationService.getStationFillSavings(props.station, props.averagePrice));
 
 const sourceChip = computed(() =>
   props.station.brandSource === "mock" ? "Dataset local" : "Source officielle",
@@ -28,11 +35,11 @@ const brandMeta = computed(() => {
   }
 
   if (props.station.brandSource === "inferred") {
-    return `Enseigne estimée : ${props.station.brand}`;
+    return `Enseigne estim\u00e9e : ${props.station.brand}`;
   }
 
   if (props.station.brandSource === "not_provided") {
-    return "Enseigne non communiquée dans la source officielle";
+    return "Enseigne non communiqu\u00e9e dans la source officielle";
   }
 
   return props.station.brand;
@@ -59,7 +66,7 @@ const openDirections = () => {
             :color="station.isOpen ? 'success' : 'error'"
             variant="tonal"
           >
-            {{ station.isOpen ? "Ouverte" : "Fermée" }}
+            {{ station.isOpen ? "Ouverte" : "Ferm\u00e9e" }}
           </v-chip>
           <v-chip
             color="white"
@@ -69,10 +76,10 @@ const openDirections = () => {
           </v-chip>
         </div>
 
-        <p class="text-overline mb-2">Station recommandée</p>
+        <p class="text-overline mb-2">Station recommand\u00e9e</p>
         <h3 class="best-station__title mb-2">{{ station.name }}</h3>
         <p class="best-station__meta mb-4">
-          {{ brandMeta }} • {{ station.address }}, {{ station.city }}
+          {{ brandMeta }} - {{ station.address }}, {{ station.city }}
         </p>
 
         <div class="d-flex flex-wrap ga-2 mb-4">
@@ -106,7 +113,7 @@ const openDirections = () => {
             variant="tonal"
             @click="router.push({ name: 'station-detail', params: { id: station.id } })"
           >
-            Voir détails
+            Voir d\u00e9tails
           </v-btn>
           <v-btn
             color="primary"
@@ -131,8 +138,14 @@ const openDirections = () => {
         <div class="best-station__price mb-2">
           {{ formatPrice(station.selectedFuelPrice) }}
         </div>
+        <p class="text-body-2 mb-2 text-medium-emphasis">
+          \u00c9conomie potentielle : <strong>{{ formatMoney(savings) }}</strong> / L
+        </p>
         <p class="text-body-2 mb-4 text-medium-emphasis">
-          Économie potentielle : <strong>{{ formatMoney(savings) }}</strong> / L
+          Plein 50L : <strong>{{ formatFuelFillCost(station.selectedFuelPrice) }}</strong>
+        </p>
+        <p class="text-body-2 mb-4 text-medium-emphasis">
+          Gain sur 50L : <strong>{{ formatMoney(fillSavings) }}</strong>
         </p>
         <div class="d-flex flex-wrap ga-2">
           <v-chip

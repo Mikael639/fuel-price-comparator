@@ -3,7 +3,13 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { stationService } from "@/services/stationService";
 import { useFuelStationsStore } from "@/stores/fuelStations";
-import { formatDistance, formatDriveTime, formatMoney, formatPrice } from "@/utils/format";
+import {
+  formatDistance,
+  formatDriveTime,
+  formatFuelFillCost,
+  formatMoney,
+  formatPrice,
+} from "@/utils/format";
 import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import type { FuelType, StationWithMetrics } from "@/types/station";
 
@@ -18,6 +24,7 @@ const router = useRouter();
 const stationStore = useFuelStationsStore();
 
 const savings = computed(() => stationService.getStationSavings(props.station, props.averagePrice));
+const fillSavings = computed(() => stationService.getStationFillSavings(props.station, props.averagePrice));
 
 const sourceChip = computed(() => (props.station.brandSource === "mock" ? "Dataset local" : "Source officielle"));
 
@@ -27,11 +34,11 @@ const brandMeta = computed(() => {
   }
 
   if (props.station.brandSource === "inferred") {
-    return `Enseigne estimée : ${props.station.brand}`;
+    return `Enseigne estim\u00e9e : ${props.station.brand}`;
   }
 
   if (props.station.brandSource === "not_provided") {
-    return "Enseigne non communiquée";
+    return "Enseigne non communiqu\u00e9e";
   }
 
   return props.station.brand;
@@ -59,7 +66,7 @@ const openDirections = () => {
             size="small"
             variant="tonal"
           >
-            {{ station.isOpen ? "Ouverte" : "Fermée" }}
+            {{ station.isOpen ? "Ouverte" : "Ferm\u00e9e" }}
           </v-chip>
           <v-chip
             size="small"
@@ -70,7 +77,7 @@ const openDirections = () => {
         </div>
         <h3 class="station-card__title mb-1">{{ station.name }}</h3>
         <p class="station-card__subtitle mb-0">
-          {{ brandMeta }} • {{ station.address }}, {{ station.city }}
+          {{ brandMeta }} - {{ station.address }}, {{ station.city }}
         </p>
       </div>
 
@@ -89,7 +96,7 @@ const openDirections = () => {
       </div>
     </div>
 
-    <div class="d-flex flex-wrap ga-2 mb-4">
+    <div class="d-flex flex-wrap ga-2 mb-3">
       <v-chip
         class="soft-chip"
         prepend-icon="mdi-map-marker-distance"
@@ -109,7 +116,7 @@ const openDirections = () => {
         prepend-icon="mdi-piggy-bank-outline"
         variant="text"
       >
-        {{ formatMoney(savings) }} d'économie / L
+        {{ formatMoney(savings) }} d'\u00e9conomie / L
       </v-chip>
       <v-chip
         v-if="station.selectedFuelPrice == null"
@@ -118,6 +125,23 @@ const openDirections = () => {
         variant="tonal"
       >
         {{ selectedFuel }} indisponible ici
+      </v-chip>
+    </div>
+
+    <div class="d-flex flex-wrap ga-2 mb-4">
+      <v-chip
+        class="soft-chip"
+        prepend-icon="mdi-gas-station-outline"
+        variant="text"
+      >
+        {{ formatFuelFillCost(station.selectedFuelPrice) }}
+      </v-chip>
+      <v-chip
+        class="soft-chip"
+        prepend-icon="mdi-cash-plus"
+        variant="text"
+      >
+        Gain 50L : {{ formatMoney(fillSavings) }}
       </v-chip>
     </div>
 
@@ -139,7 +163,7 @@ const openDirections = () => {
         variant="tonal"
         @click="router.push({ name: 'station-detail', params: { id: station.id } })"
       >
-        Voir détails
+        Voir d\u00e9tails
       </v-btn>
       <v-btn
         color="primary"

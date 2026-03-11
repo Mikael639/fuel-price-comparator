@@ -46,7 +46,7 @@ const sourceLabel = computed(() => {
     case "manual":
       return "Position manuelle";
     case "demo":
-      return "Mode démonstration";
+      return "Mode demonstration";
     case "search":
       return "Recherche libre";
     default:
@@ -71,11 +71,11 @@ const runSearch = () => {
   <v-card class="glass-card pa-5 pa-md-6">
     <div class="d-flex flex-column flex-md-row ga-6 justify-space-between">
       <div class="location-panel__copy">
-        <p class="location-panel__eyebrow mb-2">Géolocalisation</p>
+        <p class="location-panel__eyebrow mb-2">Geolocalisation</p>
         <h3 class="text-h5 section-title mb-2">Retrouvez les meilleures stations autour de vous</h3>
         <p class="location-panel__text mb-4">
-          Autorisez la géolocalisation pour un résultat live, choisissez une position
-          simulée ou recherchez librement une ville/adresse en France.
+          Autorisez la geolocalisation pour un resultat live, choisissez une position
+          simulee ou recherchez librement une ville/adresse en France.
         </p>
 
         <div class="d-flex flex-wrap ga-3">
@@ -100,7 +100,7 @@ const runSearch = () => {
             prepend-icon="mdi-map-marker-star"
             @click="emit('demo')"
           >
-            Position de démonstration
+            Position de demonstration
           </v-btn>
         </div>
       </div>
@@ -126,7 +126,7 @@ const runSearch = () => {
                 v-if="coordinatesLabel"
                 class="location-panel__coords mt-2 mb-0"
               >
-                Coordonnées détectées : {{ coordinatesLabel }}
+                Coordonnees detectees : {{ coordinatesLabel }}
               </p>
             </div>
           </div>
@@ -138,7 +138,7 @@ const runSearch = () => {
           clearable
           item-title="label"
           item-value="id"
-          label="Ville de démonstration"
+          label="Ville de demonstration"
           prepend-inner-icon="mdi-map-search-outline"
           @update:model-value="(value) => value && emit('selectManual', String(value))"
         />
@@ -175,7 +175,7 @@ const runSearch = () => {
             append-icon="mdi-chevron-right"
             class="location-panel__result"
             :subtitle="result.address"
-            :title="`${result.label} • ${result.city}`"
+            :title="`${result.label} - ${result.city}`"
             @click="emit('selectSearchResult', result)"
           />
         </v-list>

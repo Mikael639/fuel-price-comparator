@@ -39,10 +39,24 @@ interface DailyHistoryResponse {
   results?: DailyHistoryRecord[];
 }
 
+interface RequestOptions {
+  signal?: AbortSignal;
+  forceRefresh?: boolean;
+}
+
+interface CacheEntry<T> {
+  expiresAt: number;
+  value: T;
+}
+
 const API_BASE_URL =
   "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
 const DAILY_API_BASE_URL =
   "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-carburants-quotidien/records";
+
+const STATIONS_CACHE_TTL_MS = 60 * 1000;
+const STATION_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+const HISTORY_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const stationSelect =
   "id,adresse,ville,cp,geom,services_service,horaires,horaires_jour,horaires_automate_24_24,sp95_prix,sp98_prix,gazole_prix,e85_prix,gplc_prix,e10_prix,carburants_disponibles,carburants_indisponibles";
@@ -79,28 +93,92 @@ const buildDailyHistoryUrl = (id: string) => {
 };
 
 class FuelApiService {
-  async getStationsAround(position: Coordinates, radiusKm: number) {
-    const payload = await fetchJson<ApiRecordsResponse>(buildNearbyUrl(position, radiusKm), {
+  private readonly nearbyCache = new Map<string, CacheEntry<ApiStationRecord[]>>();
+  private readonly stationByIdCache = new Map<string, CacheEntry<ApiStationRecord | null>>();
+  private readonly dailyHistoryCache = new Map<string, CacheEntry<DailyHistoryRecord[]>>();
+
+  private getCachedValue<T>(cache: Map<string, CacheEntry<T>>, cacheKey: string) {
+    const cachedEntry = cache.get(cacheKey);
+
+    if (!cachedEntry) {
+      return null;
+    }
+
+    if (cachedEntry.expiresAt <= Date.now()) {
+      cache.delete(cacheKey);
+      return null;
+    }
+
+    return cachedEntry.value;
+  }
+
+  private setCachedValue<T>(
+    cache: Map<string, CacheEntry<T>>,
+    cacheKey: string,
+    value: T,
+    ttlMs: number,
+  ) {
+    cache.set(cacheKey, {
+      expiresAt: Date.now() + ttlMs,
+      value,
+    });
+  }
+
+  async getStationsAround(position: Coordinates, radiusKm: number, options?: RequestOptions) {
+    const requestUrl = buildNearbyUrl(position, radiusKm);
+    const cachedValue = options?.forceRefresh ? null : this.getCachedValue(this.nearbyCache, requestUrl);
+
+    if (cachedValue) {
+      return cachedValue;
+    }
+
+    const payload = await fetchJson<ApiRecordsResponse>(requestUrl, {
+      signal: options?.signal,
+      timeoutMs: 10_000,
       errorMessage: "L'API officielle des carburants est indisponible.",
     });
 
-    return payload.results ?? [];
+    const results = payload.results ?? [];
+    this.setCachedValue(this.nearbyCache, requestUrl, results, STATIONS_CACHE_TTL_MS);
+    return results;
   }
 
-  async getStationById(id: string) {
-    const payload = await fetchJson<ApiRecordsResponse>(buildStationByIdUrl(id), {
-      errorMessage: "La station demandée est indisponible dans l'API officielle.",
+  async getStationById(id: string, options?: RequestOptions) {
+    const requestUrl = buildStationByIdUrl(id);
+    const cachedValue = options?.forceRefresh ? null : this.getCachedValue(this.stationByIdCache, requestUrl);
+
+    if (cachedValue !== null) {
+      return cachedValue;
+    }
+
+    const payload = await fetchJson<ApiRecordsResponse>(requestUrl, {
+      signal: options?.signal,
+      timeoutMs: 10_000,
+      errorMessage: "La station demand\u00e9e est indisponible dans l'API officielle.",
     });
 
-    return payload.results?.[0] ?? null;
+    const result = payload.results?.[0] ?? null;
+    this.setCachedValue(this.stationByIdCache, requestUrl, result, STATION_DETAIL_CACHE_TTL_MS);
+    return result;
   }
 
-  async getDailyHistory(id: string) {
-    const payload = await fetchJson<DailyHistoryResponse>(buildDailyHistoryUrl(id), {
+  async getDailyHistory(id: string, options?: RequestOptions) {
+    const requestUrl = buildDailyHistoryUrl(id);
+    const cachedValue = options?.forceRefresh ? null : this.getCachedValue(this.dailyHistoryCache, requestUrl);
+
+    if (cachedValue) {
+      return cachedValue;
+    }
+
+    const payload = await fetchJson<DailyHistoryResponse>(requestUrl, {
+      signal: options?.signal,
+      timeoutMs: 10_000,
       errorMessage: "L'historique officiel des prix est indisponible.",
     });
 
-    return payload.results ?? [];
+    const results = payload.results ?? [];
+    this.setCachedValue(this.dailyHistoryCache, requestUrl, results, HISTORY_CACHE_TTL_MS);
+    return results;
   }
 }
 

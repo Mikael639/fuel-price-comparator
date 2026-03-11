@@ -30,7 +30,7 @@ const toggleTheme = () => {
         </v-avatar>
 
         <div>
-          <p class="header-bar__eyebrow mb-1">Comparateur carburants géolocalisé</p>
+          <p class="header-bar__eyebrow mb-1">Comparateur carburants geolocalise</p>
           <h1 class="header-bar__title">FuelFlash</h1>
         </div>
       </div>

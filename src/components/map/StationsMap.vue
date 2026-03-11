@@ -87,18 +87,17 @@ const formatBrandMeta = (station: StationWithMetrics) => {
   }
 
   if (station.brandSource === "inferred") {
-    return `Enseigne estimée : ${station.brand}`;
+    return `Enseigne estimee : ${station.brand}`;
   }
 
   if (station.brandSource === "not_provided") {
-    return "Enseigne non communiquée • source officielle";
+    return "Enseigne non communiquee - source officielle";
   }
 
   return station.brand;
 };
 
-const summarizeServices = (station: StationWithMetrics) =>
-  station.services.slice(0, 3).join(" • ");
+const summarizeServices = (station: StationWithMetrics) => station.services.slice(0, 3).join(" - ");
 
 const popupContent = (station: StationWithMetrics) => {
   const stationUrl = `/station/${station.id}`;
@@ -109,15 +108,15 @@ const popupContent = (station: StationWithMetrics) => {
   return `
     <div class="map-popup">
       <h4 class="map-popup__title">${station.name}</h4>
-      <p class="map-popup__meta">${formatBrandMeta(station)} • ${station.address}, ${station.city}</p>
+      <p class="map-popup__meta">${formatBrandMeta(station)} - ${station.address}, ${station.city}</p>
       <div class="map-popup__price-row">
         <span class="map-popup__fuel">${props.selectedFuel}</span>
         <strong class="map-popup__price">${formatPrice(station.selectedFuelPrice)}</strong>
       </div>
-      <p class="map-popup__meta">${formatDistance(station.distanceKm)} • ~ ${formatDriveTime(station.estimatedDriveMinutes)}</p>
+      <p class="map-popup__meta">${formatDistance(station.distanceKm)} - ~ ${formatDriveTime(station.estimatedDriveMinutes)}</p>
       <p class="map-popup__meta">${station.openingHours}</p>
       <span class="map-popup__status${statusClass}">
-        ${station.isOpen ? "Ouverte" : "Fermée"}
+        ${station.isOpen ? "Ouverte" : "Fermee"}
       </span>
       ${
         servicesSummary
@@ -127,7 +126,7 @@ const popupContent = (station: StationWithMetrics) => {
           : ""
       }
       <div class="map-popup__actions">
-        <a class="map-popup__button map-popup__button--ghost" href="${stationUrl}">Voir détails</a>
+        <a class="map-popup__button map-popup__button--ghost" href="${stationUrl}">Voir details</a>
         <a class="map-popup__button" href="${directionsUrl}" target="_blank" rel="noopener noreferrer">Y aller</a>
       </div>
     </div>
@@ -425,7 +424,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="map-legend__item">
           <span class="map-legend__status map-legend__status--closed" />
-          <span>Fermée</span>
+          <span>Fermee</span>
         </div>
         <div class="map-legend__item">
           <span class="map-legend__ring" />
@@ -436,7 +435,7 @@ onBeforeUnmount(() => {
           class="map-legend__item"
         >
           <span class="map-legend__dot map-legend__dot--best" />
-          <span>Meilleur prix recommandé</span>
+          <span>Meilleur prix recommande</span>
         </div>
       </div>
 
@@ -453,6 +452,7 @@ onBeforeUnmount(() => {
         <div
           v-if="selectedStation"
           class="map-selection-sheet"
+          :class="{ 'map-selection-sheet--dark': themeName === 'fuelDark' }"
         >
           <div class="d-flex align-start justify-space-between ga-3 mb-2">
             <div>
@@ -475,7 +475,7 @@ onBeforeUnmount(() => {
               color="primary"
               variant="tonal"
             >
-              {{ selectedFuel }} • {{ formatPrice(selectedStation.selectedFuelPrice) }}
+              {{ selectedFuel }} - {{ formatPrice(selectedStation.selectedFuelPrice) }}
             </v-chip>
             <v-chip
               class="soft-chip"
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
               variant="tonal"
               @click="openSelectedStation"
             >
-              Voir détails
+              Voir details
             </v-btn>
             <v-btn
               color="primary"
@@ -666,6 +666,26 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(18px);
 }
 
+.map-selection-sheet--dark {
+  border-color: rgba(125, 211, 252, 0.12);
+  background: linear-gradient(180deg, rgba(7, 22, 28, 0.92), rgba(13, 31, 39, 0.9));
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.35);
+  color: rgba(226, 247, 241, 0.82);
+}
+
+.map-selection-sheet--dark .map-selection-sheet__title {
+  color: #f8fafc;
+}
+
+.map-selection-sheet--dark .text-caption,
+.map-selection-sheet--dark .text-body-2 {
+  color: rgba(226, 247, 241, 0.78) !important;
+}
+
+.map-selection-sheet--dark .soft-chip {
+  color: rgba(226, 247, 241, 0.88);
+}
+
 .map-selection-sheet__title {
   font-family: var(--ff-display);
   font-size: 1.05rem;
@@ -702,8 +722,7 @@ onBeforeUnmount(() => {
   border-color: rgba(94, 234, 212, 0.9);
 }
 
-:global(.v-theme--fuelDark) .stations-map__credit,
-:global(.v-theme--fuelDark) .map-selection-sheet {
+:global(.v-theme--fuelDark) .stations-map__credit {
   background: rgba(7, 22, 28, 0.76);
   color: rgba(226, 247, 241, 0.8);
 }

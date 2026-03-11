@@ -52,7 +52,8 @@ class OsmService {
           "Content-Type": "text/plain;charset=UTF-8",
         },
         body: buildBrandQuery(lat, lng),
-        errorMessage: "La source OSM complémentaire est indisponible.",
+        timeoutMs: 8_000,
+        errorMessage: "La source OSM compl\u00e9mentaire est indisponible.",
       });
 
       const bestMatch = (payload.elements ?? [])

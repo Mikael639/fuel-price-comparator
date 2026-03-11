@@ -5,6 +5,7 @@ import {
   mergeStationHistory,
   normalizeOfficialText,
   sortStations,
+  stationService,
 } from "@/services/stationService";
 import type { FuelStation, StationWithMetrics } from "@/types/station";
 
@@ -110,5 +111,18 @@ describe("stationService helpers", () => {
     ];
 
     expect(sortStations(stations, "savings")[0]?.id).toBe("3");
+  });
+
+  it("computes savings for a 50L fill", () => {
+    const station: StationWithMetrics = {
+      ...baseStation,
+      distanceKm: 4,
+      selectedFuelPrice: 1.7,
+      estimatedDriveMinutes: 9,
+      savingsPerLiter: 0.07,
+      isFavorite: false,
+    };
+
+    expect(stationService.getStationFillSavings(station, 1.77)).toBeCloseTo(3.5);
   });
 });

@@ -10,7 +10,7 @@ const theme = useTheme();
 watch(
   () => stationStore.themeName,
   (value) => {
-    theme.change(value);
+    theme.global.name.value = value;
   },
   { immediate: true },
 );

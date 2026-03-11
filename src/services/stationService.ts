@@ -601,8 +601,8 @@ class StationService {
     return fuelStations;
   }
 
-  async getStationsAround(position: Coordinates, radiusKm: number) {
-    const records = await fuelApiService.getStationsAround(position, radiusKm);
+  async getStationsAround(position: Coordinates, radiusKm: number, options?: { signal?: AbortSignal }) {
+    const records = await fuelApiService.getStationsAround(position, radiusKm, options);
     const stations = records
       .map(mapRecordToStation)
       .filter((station): station is FuelStation => station != null);
@@ -610,14 +610,14 @@ class StationService {
     return dedupeStations(stations);
   }
 
-  async getStationById(id: string) {
-    const record = await fuelApiService.getStationById(id);
+  async getStationById(id: string, options?: { signal?: AbortSignal }) {
+    const record = await fuelApiService.getStationById(id, options);
     return record ? mapRecordToStation(record) : null;
   }
 
-  async enrichStationHistory(station: FuelStation): Promise<FuelStation> {
+  async enrichStationHistory(station: FuelStation, options?: { signal?: AbortSignal }): Promise<FuelStation> {
     try {
-      const dailyHistory = await fuelApiService.getDailyHistory(station.id);
+      const dailyHistory = await fuelApiService.getDailyHistory(station.id, options);
       return mergeStationHistory(station, dailyHistory);
     } catch {
       return station;
@@ -739,6 +739,20 @@ class StationService {
     }
 
     return Math.max(averagePrice - station.selectedFuelPrice, 0);
+  }
+
+  getStationFillSavings(
+    station: StationWithMetrics,
+    averagePrice: number | null,
+    liters = 50,
+  ) {
+    const savingsPerLiter = this.getStationSavings(station, averagePrice);
+
+    if (savingsPerLiter == null) {
+      return null;
+    }
+
+    return savingsPerLiter * liters;
   }
 
   getStats(stations: StationWithMetrics[]): StationStats {

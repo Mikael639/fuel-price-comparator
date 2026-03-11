@@ -16,7 +16,18 @@ interface NominatimResult {
   name?: string;
 }
 
+interface SearchOptions {
+  signal?: AbortSignal;
+  forceRefresh?: boolean;
+}
+
+interface CacheEntry {
+  expiresAt: number;
+  results: GeocodingResult[];
+}
+
 const GEOCODING_URL = "https://nominatim.openstreetmap.org/search";
+const GEOCODING_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const buildGeocodingUrl = (query: string) => {
   const params = new URLSearchParams({
@@ -24,6 +35,7 @@ const buildGeocodingUrl = (query: string) => {
     countrycodes: "fr",
     limit: "5",
     addressdetails: "1",
+    "accept-language": "fr",
     q: query,
   });
 
@@ -37,7 +49,7 @@ const toResult = (record: NominatimResult): GeocodingResult => {
     record.address?.village ??
     record.address?.municipality ??
     record.address?.county ??
-    "Lieu recherché";
+    "Lieu recherch\u00e9";
 
   return {
     id: String(record.place_id),
@@ -50,18 +62,50 @@ const toResult = (record: NominatimResult): GeocodingResult => {
 };
 
 class GeocodingService {
-  async search(query: string) {
+  private readonly searchCache = new Map<string, CacheEntry>();
+
+  private getCachedResults(cacheKey: string) {
+    const cachedEntry = this.searchCache.get(cacheKey);
+
+    if (!cachedEntry) {
+      return null;
+    }
+
+    if (cachedEntry.expiresAt <= Date.now()) {
+      this.searchCache.delete(cacheKey);
+      return null;
+    }
+
+    return cachedEntry.results;
+  }
+
+  async search(query: string, options?: SearchOptions) {
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
       return [];
     }
 
+    const cacheKey = trimmedQuery.toLocaleLowerCase("fr-FR");
+    const cachedResults = options?.forceRefresh ? null : this.getCachedResults(cacheKey);
+
+    if (cachedResults) {
+      return cachedResults;
+    }
+
     const payload = await fetchJson<NominatimResult[]>(buildGeocodingUrl(trimmedQuery), {
-      errorMessage: "Le géocodage est indisponible pour le moment.",
+      signal: options?.signal,
+      timeoutMs: 8_000,
+      errorMessage: "Le g\u00e9ocodage est indisponible pour le moment.",
     });
 
-    return payload.map(toResult);
+    const results = payload.map(toResult);
+    this.searchCache.set(cacheKey, {
+      expiresAt: Date.now() + GEOCODING_CACHE_TTL_MS,
+      results,
+    });
+
+    return results;
   }
 }
 
