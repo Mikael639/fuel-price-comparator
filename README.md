@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FuelFlash
 
-## Getting Started
+Prototype mobile-first de comparaison de prix des carburants, construit avec Vue 3, Vite, Vuetify, Pinia, Vue Router, Leaflet et Chart.js.
 
-First, run the development server:
+## Fonctionnalites
+
+- geolocalisation navigateur avec gestion du refus et erreurs
+- fallback manuel via positions simulees et recherche libre par ville/adresse
+- donnees live DGCCRF via `prix-carburants.gouv.fr`
+- historique de prix enrichi via le dataset quotidien officiel
+- comparateur par carburant `SP95`, `SP98`, `Diesel`, `E85`, `GPL`
+- tri par prix, distance, economies, favoris
+- deduplication de stations tres proches
+- carte interactive avec clustering, rayon reel, fiche mobile, temps de trajet estime et navigation GPS
+- favoris persistants
+- theme clair / sombre
+- tests unitaires Vitest et test UI Playwright
+
+## Stack
+
+- Vue 3
+- Vite
+- TypeScript
+- Vuetify
+- Vue Router
+- Pinia
+- Leaflet + `leaflet.markercluster`
+- Chart.js + `vue-chartjs`
+- Vitest
+- Playwright
+
+## Installation
+
+```bash
+npm install
+npm run dev
+```
+
+Application locale par defaut: `http://localhost:3000`
+
+## Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run preview
+npm run test:unit
+npm run test:e2e
+npm test
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Arborescence
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+src/
+  components/
+    common/
+    filters/
+    layout/
+    map/
+    station/
+  composables/
+  data/
+  plugins/
+  router/
+  services/
+  stores/
+  styles/
+  test/
+  types/
+  utils/
+  views/
+tests/
+  e2e/
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+- [src/services/apiClient.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/apiClient.ts): client HTTP commun et erreurs API centralisees
+- [src/services/fuelApi.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/fuelApi.ts): appels aux datasets officiels carburants
+- [src/services/geocodingService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/geocodingService.ts): geocodage libre via Nominatim
+- [src/services/osmService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/osmService.ts): enrichissement ponctuel d'enseigne via OpenStreetMap
+- [src/services/stationService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/stationService.ts): mapping, normalisation, deduplication, tri, historique
+- [src/stores/fuelStations.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/stores/fuelStations.ts): etat global, persistance, filtres, favoris, position
+- [src/composables/useGeolocation.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/composables/useGeolocation.ts): acces geolocalisation navigateur
+- [src/utils/geo.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/utils/geo.ts): distance Haversine et temps de trajet estime
 
-To learn more about Next.js, take a look at the following resources:
+## Remplacer plus tard par une vraie API
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. conserver [src/types/station.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/types/station.ts) comme contrat unique entre API, store et UI
+2. remplacer les endpoints dans [src/services/fuelApi.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/fuelApi.ts) par votre backend
+3. garder [src/services/apiClient.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/apiClient.ts) pour la gestion d'erreurs commune
+4. conserver [src/services/stationService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/stationService.ts) comme couche de mapping/metier pour ne pas coupler les vues a la forme brute de l'API
+5. faire evoluer [src/stores/fuelStations.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/stores/fuelStations.ts) sans changer les composants tant que le format `FuelStation` reste stable
