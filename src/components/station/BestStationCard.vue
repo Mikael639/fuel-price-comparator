@@ -6,6 +6,7 @@ import { useFuelStationsStore } from "@/stores/fuelStations";
 import {
   formatDistance,
   formatDriveTime,
+  formatFreshness,
   formatFuelFillCost,
   formatMoney,
   formatPrice,
@@ -23,11 +24,20 @@ const router = useRouter();
 const stationStore = useFuelStationsStore();
 
 const savings = computed(() => stationService.getStationSavings(props.station, props.averagePrice));
-const fillSavings = computed(() => stationService.getStationFillSavings(props.station, props.averagePrice));
-
-const sourceChip = computed(() =>
-  props.station.brandSource === "mock" ? "Dataset local" : "Source officielle",
+const fillSavings = computed(() => stationService.getStationFillSavings(props.station, props.averagePrice, props.station.fillVolumeLiters));
+const netSavings = computed(() =>
+  stationService.getStationNetSavingsForFill(
+    props.station,
+    props.averagePrice,
+    props.station.fillVolumeLiters,
+    stationStore.consumptionLitersPer100Km,
+  ),
 );
+const freshnessLabel = computed(() =>
+  formatFreshness(props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt),
+);
+
+const sourceChip = computed(() => (props.station.dataOrigin === "mock" ? "Dataset local" : "Source officielle"));
 
 const brandMeta = computed(() => {
   if (props.station.brandSource === "osm") {
@@ -35,11 +45,11 @@ const brandMeta = computed(() => {
   }
 
   if (props.station.brandSource === "inferred") {
-    return `Enseigne estim\u00e9e : ${props.station.brand}`;
+    return `Enseigne estimee : ${props.station.brand}`;
   }
 
   if (props.station.brandSource === "not_provided") {
-    return "Enseigne non communiqu\u00e9e dans la source officielle";
+    return "Enseigne non communiquee dans la source officielle";
   }
 
   return props.station.brand;
@@ -60,13 +70,13 @@ const openDirections = () => {
             prepend-icon="mdi-star-circle"
             variant="flat"
           >
-            Meilleur prix
+            Recommandation active
           </v-chip>
           <v-chip
             :color="station.isOpen ? 'success' : 'error'"
             variant="tonal"
           >
-            {{ station.isOpen ? "Ouverte" : "Ferm\u00e9e" }}
+            {{ station.isOpen ? "Ouverte" : "Fermee" }}
           </v-chip>
           <v-chip
             color="white"
@@ -76,11 +86,12 @@ const openDirections = () => {
           </v-chip>
         </div>
 
-        <p class="text-overline mb-2">Station recommand\u00e9e</p>
+        <p class="text-overline mb-2">Station recommandee</p>
         <h3 class="best-station__title mb-2">{{ station.name }}</h3>
-        <p class="best-station__meta mb-4">
+        <p class="best-station__meta mb-2">
           {{ brandMeta }} - {{ station.address }}, {{ station.city }}
         </p>
+        <p class="text-body-2 mb-4">{{ freshnessLabel }}</p>
 
         <div class="d-flex flex-wrap ga-2 mb-4">
           <v-chip
@@ -113,7 +124,7 @@ const openDirections = () => {
             variant="tonal"
             @click="router.push({ name: 'station-detail', params: { id: station.id } })"
           >
-            Voir d\u00e9tails
+            Voir details
           </v-btn>
           <v-btn
             color="primary"
@@ -139,15 +150,18 @@ const openDirections = () => {
           {{ formatPrice(station.selectedFuelPrice) }}
         </div>
         <p class="text-body-2 mb-2 text-medium-emphasis">
-          \u00c9conomie potentielle : <strong>{{ formatMoney(savings) }}</strong> / L
+          Economie potentielle : <strong>{{ formatMoney(savings) }}</strong> / L
+        </p>
+        <p class="text-body-2 mb-2 text-medium-emphasis">
+          Plein {{ station.fillVolumeLiters }}L : <strong>{{ formatFuelFillCost(station.selectedFuelPrice, station.fillVolumeLiters) }}</strong>
+        </p>
+        <p class="text-body-2 mb-2 text-medium-emphasis">
+          Detour estime : <strong>{{ formatMoney(station.estimatedDetourCost) }}</strong>
         </p>
         <p class="text-body-2 mb-4 text-medium-emphasis">
-          Plein 50L : <strong>{{ formatFuelFillCost(station.selectedFuelPrice) }}</strong>
+          Gain net : <strong>{{ formatMoney(netSavings) }}</strong>
         </p>
-        <p class="text-body-2 mb-4 text-medium-emphasis">
-          Gain sur 50L : <strong>{{ formatMoney(fillSavings) }}</strong>
-        </p>
-        <div class="d-flex flex-wrap ga-2">
+        <div class="d-flex flex-wrap ga-2 mb-3">
           <v-chip
             v-for="service in station.services"
             :key="service"
@@ -157,6 +171,12 @@ const openDirections = () => {
             {{ service }}
           </v-chip>
         </div>
+        <v-alert
+          color="white"
+          variant="tonal"
+        >
+          Gain brut avant detour : <strong>{{ formatMoney(fillSavings) }}</strong>
+        </v-alert>
       </div>
     </div>
   </v-card>

@@ -29,10 +29,13 @@ interface PersistedPreferences {
   manualLocationId: string | null;
   sortMode: SortMode;
   favoriteIds: string[];
+  tankVolumeLiters: number;
+  consumptionLitersPer100Km: number;
+  favoriteAlertPrice: number | null;
   lastLocation: PersistedLocation | null;
 }
 
-const STORAGE_KEY = "fuel-flash:preferences:v4";
+const STORAGE_KEY = "fuel-flash:preferences:v5";
 const defaultPreferences: PersistedPreferences = {
   selectedFuel: "Diesel",
   radiusKm: appConfig.stations.defaultRadiusKm,
@@ -42,6 +45,9 @@ const defaultPreferences: PersistedPreferences = {
   manualLocationId: null,
   sortMode: "price",
   favoriteIds: [],
+  tankVolumeLiters: appConfig.stations.defaultTankVolumeLiters,
+  consumptionLitersPer100Km: appConfig.stations.defaultConsumptionLitersPer100Km,
+  favoriteAlertPrice: appConfig.stations.defaultFavoriteAlertPrice,
   lastLocation: null,
 };
 
@@ -62,6 +68,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
 
   const stations = ref<FuelStation[]>([]);
   const isLoading = ref(false);
+  const isHydratingHistory = ref(false);
   const isGeolocating = ref(false);
   const isSearchingLocation = ref(false);
   const geoError = ref<string | null>(null);
@@ -76,6 +83,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
   const manualLocationId = ref<string | null>(persistedPreferences.manualLocationId);
   const sortMode = ref<SortMode>(persistedPreferences.sortMode);
   const favoriteIds = ref<string[]>(persistedPreferences.favoriteIds);
+  const tankVolumeLiters = ref<number>(persistedPreferences.tankVolumeLiters);
+  const consumptionLitersPer100Km = ref<number>(persistedPreferences.consumptionLitersPer100Km);
+  const favoriteAlertPrice = ref<number | null>(persistedPreferences.favoriteAlertPrice);
   const locationSource = ref<LocationSource>(persistedLocation?.source ?? null);
   const userPosition = ref<Coordinates | null>(toCoordinates(persistedLocation));
   const locationPlaceId = ref<string | null>(persistedLocation?.placeId ?? null);
@@ -105,16 +115,21 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       fuel: selectedFuel.value,
       sortMode: sortMode.value,
       favoriteIds: favoriteIds.value,
+      tankVolumeLiters: tankVolumeLiters.value,
+      consumptionLitersPer100Km: consumptionLitersPer100Km.value,
     });
   });
 
   const comparableStations = computed(() => stationService.getComparableStations(nearbyStations.value));
   const bestStation = computed(() =>
-    stationService.getRecommendedBestStation(nearbyStations.value, radiusKm.value),
+    stationService.getRecommendedBestStation(nearbyStations.value, radiusKm.value, sortMode.value),
   );
-  const stats = computed(() => stationService.getStats(nearbyStations.value));
+  const stats = computed(() => stationService.getStats(nearbyStations.value, selectedFuel.value));
   const availableServices = computed(() => stationService.getAvailableServices(stations.value));
   const favoriteStations = computed(() => nearbyStations.value.filter((station) => station.isFavorite));
+  const favoriteAlerts = computed(() =>
+    stationService.getFavoriteAlerts(nearbyStations.value, selectedFuel.value, favoriteAlertPrice.value),
+  );
   const hasResults = computed(() => nearbyStations.value.length > 0);
   const hasComparableResults = computed(() => comparableStations.value.length > 0);
   const isDataUnavailable = computed(() => !isLoading.value && stations.value.length === 0);
@@ -139,6 +154,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       manualLocationId: manualLocationId.value,
       sortMode: sortMode.value,
       favoriteIds: favoriteIds.value,
+      tankVolumeLiters: tankVolumeLiters.value,
+      consumptionLitersPer100Km: consumptionLitersPer100Km.value,
+      favoriteAlertPrice: favoriteAlertPrice.value,
       lastLocation: nextLocation,
     });
   };
@@ -153,6 +171,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       manualLocationId,
       sortMode,
       favoriteIds,
+      tankVolumeLiters,
+      consumptionLitersPer100Km,
+      favoriteAlertPrice,
       userPosition,
       locationSource,
       locationPlaceId,
@@ -214,6 +235,30 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     }
   };
 
+  const hydrateStationsHistory = async (
+    nextStations: FuelStation[],
+    requestId: number,
+    signal: AbortSignal,
+  ) => {
+    isHydratingHistory.value = true;
+
+    try {
+      const historyEnrichedStations = await stationService.enrichStationsHistory(nextStations, {
+        signal,
+      });
+
+      if (requestId !== activeLoadRequestId) {
+        return;
+      }
+
+      stations.value = historyEnrichedStations;
+    } finally {
+      if (requestId === activeLoadRequestId) {
+        isHydratingHistory.value = false;
+      }
+    }
+  };
+
   const initialize = async () => {
     if (stations.value.length === 0) {
       stations.value = stationService.getMockStations();
@@ -229,6 +274,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     activeLoadAbortController?.abort();
     activeLoadAbortController = new AbortController();
     isLoading.value = true;
+    isHydratingHistory.value = false;
     genericError.value = null;
 
     try {
@@ -246,6 +292,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
         genericError.value = "Aucune station n'a \u00e9t\u00e9 retourn\u00e9e par l'API officielle dans cette zone.";
       } else {
         void enrichNearestBrands(position);
+        void hydrateStationsHistory(nextStations, requestId, activeLoadAbortController.signal);
       }
     } catch (error) {
       if (isAbortError(error) || requestId !== activeLoadRequestId) {
@@ -253,6 +300,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       }
 
       stations.value = stationService.getMockStations();
+      isHydratingHistory.value = false;
       genericError.value =
         error instanceof Error
           ? `${error.message} Affichage du dataset local de secours.`
@@ -465,6 +513,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     locationSource,
     locationPlaceId,
     isLoading,
+    isHydratingHistory,
     isGeolocating,
     isSearchingLocation,
     geoError,
@@ -476,6 +525,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     openOnly,
     selectedServices,
     sortMode,
+    tankVolumeLiters,
+    consumptionLitersPer100Km,
+    favoriteAlertPrice,
     themeName,
     manualLocationId,
     favoriteIds,
@@ -486,6 +538,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     comparableStations,
     bestStation,
     favoriteStations,
+    favoriteAlerts,
     stats,
     hasResults,
     hasComparableResults,

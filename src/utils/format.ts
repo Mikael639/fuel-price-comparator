@@ -15,6 +15,17 @@ const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
   month: "short",
 });
 
+const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("fr-FR", {
+  numeric: "auto",
+});
+
 export const formatPrice = (price: number | null | undefined) =>
   price == null ? "Indisponible" : `${priceFormatter.format(price)} \u20ac/L`;
 
@@ -29,6 +40,33 @@ export const formatFuelFillCost = (pricePerLiter: number | null | undefined, lit
 
 export const formatDateLabel = (value: string) => dateFormatter.format(new Date(value));
 
+export const formatDateTime = (value: string | null | undefined) =>
+  value == null ? "Date indisponible" : dateTimeFormatter.format(new Date(value));
+
+export const formatRelativeDate = (value: string | null | undefined) => {
+  if (!value) {
+    return "mise a jour inconnue";
+  }
+
+  const diffMs = new Date(value).getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / (60 * 1000));
+
+  if (Math.abs(diffMinutes) < 60) {
+    return relativeTimeFormatter.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+
+  if (Math.abs(diffHours) < 24) {
+    return relativeTimeFormatter.format(diffHours, "hour");
+  }
+
+  return relativeTimeFormatter.format(Math.round(diffHours / 24), "day");
+};
+
+export const formatFreshness = (value: string | null | undefined) =>
+  value == null ? "Mise a jour inconnue" : `Mis a jour ${formatRelativeDate(value)}`;
+
 export const formatDriveTime = (minutes: number) =>
   minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 
@@ -41,6 +79,7 @@ export const trendCopy: Record<PriceTrend, string> = {
 export const sortModeCopy: Record<SortMode, string> = {
   price: "Prix",
   distance: "Distance",
-  savings: "\u00c9conomies",
+  savings: "Economies",
+  smartFill: "Plein malin",
   favorites: "Favoris d'abord",
 };

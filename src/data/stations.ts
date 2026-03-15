@@ -25,7 +25,7 @@ const createHistorySeries = (values: number[]) =>
 const services = (...items: ServiceType[]) => items;
 
 const createStation = (
-  station: Omit<FuelStation, "fuels" | "priceHistory" | "brandSource"> & {
+  station: Omit<FuelStation, "fuels" | "priceHistory" | "brandSource" | "dataOrigin" | "priceUpdatedAt" | "lastUpdatedAt"> & {
     fuelPrices: FuelPrices;
     history: Partial<Record<FuelType, number[]>>;
   },
@@ -38,11 +38,31 @@ const createStation = (
     {},
   );
 
+  const priceUpdatedAt = Object.entries(priceHistory).reduce<Partial<Record<FuelType, string>>>(
+    (updates, [fuel, historyPoints]) => {
+      const latestPoint = historyPoints.at(-1);
+
+      if (latestPoint) {
+        updates[fuel as FuelType] = latestPoint.date;
+      }
+
+      return updates;
+    },
+    {},
+  );
+
+  const lastUpdatedAt =
+    Object.values(priceUpdatedAt)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1) ?? null;
+
   return {
     id: station.id,
     name: station.name,
     brand: station.brand,
     brandSource: "mock",
+    dataOrigin: "mock",
     address: station.address,
     city: station.city,
     lat: station.lat,
@@ -52,6 +72,8 @@ const createStation = (
     fuelPrices: station.fuelPrices,
     fuels: Object.keys(station.fuelPrices) as FuelType[],
     priceHistory,
+    priceUpdatedAt,
+    lastUpdatedAt,
     services: station.services,
   };
 };

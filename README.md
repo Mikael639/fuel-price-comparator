@@ -8,12 +8,16 @@ Prototype mobile-first de comparaison de prix des carburants, construit avec Vue
 - fallback manuel via positions simulees et recherche libre par ville/adresse
 - donnees live DGCCRF via `prix-carburants.gouv.fr`
 - historique de prix enrichi via le dataset quotidien officiel
+- historique local hydrate en batch via le dataset quotidien officiel
 - comparateur par carburant `SP95`, `SP98`, `Diesel`, `E85`, `GPL`
 - tri par prix, distance, economies, favoris
+- mode `plein malin` avec volume reservoir, consommation et gain net apres detour
 - deduplication de stations tres proches
 - carte interactive avec clustering, rayon reel, fiche mobile, temps de trajet estime et navigation GPS
 - favoris persistants
+- alertes favoris et indicateurs de fraicheur des donnees
 - theme clair / sombre
+- proxy backend leger optionnel pour DGCCRF, geocodage et Europe live
 - tests unitaires Vitest et test UI Playwright
 
 ## Stack
@@ -42,6 +46,8 @@ Application locale par defaut: `http://localhost:3000`
 
 ```bash
 npm run dev
+npm run dev:proxy
+npm run dev:full
 npm run build
 npm run preview
 npm run test:unit
@@ -78,10 +84,12 @@ tests/
 
 - [src/services/apiClient.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/apiClient.ts): client HTTP commun et erreurs API centralisees
 - [src/services/fuelApi.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/fuelApi.ts): appels aux datasets officiels carburants
+- [src/services/europeFuelService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/europeFuelService.ts): fallback local + chargement Europe live via proxy
 - [src/services/geocodingService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/geocodingService.ts): geocodage libre via Nominatim
 - [src/services/osmService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/osmService.ts): enrichissement ponctuel d'enseigne via OpenStreetMap
 - [src/services/stationService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/stationService.ts): mapping, normalisation, deduplication, tri, historique
 - [src/stores/fuelStations.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/stores/fuelStations.ts): etat global, persistance, filtres, favoris, position
+- [server/proxy-server.mjs](/c:/Users/mikae/Mika2026/fuel-price-comparator/server/proxy-server.mjs): proxy optionnel pour centraliser les appels externes et exposer l'Europe live
 - [src/composables/useGeolocation.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/composables/useGeolocation.ts): acces geolocalisation navigateur
 - [src/utils/geo.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/utils/geo.ts): distance Haversine et temps de trajet estime
 

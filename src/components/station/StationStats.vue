@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { formatMoney, formatPrice } from "@/utils/format";
+import { formatFreshness, formatMoney, formatPrice } from "@/utils/format";
 
 defineProps<{
   stationCount: number;
   comparableCount: number;
   averagePrice: number | null;
   maxSavings: number | null;
+  maxNetSavings: number | null;
+  freshestPriceUpdate: string | null;
+  staleCount: number;
 }>();
 
 const cards = [
   {
-    title: "Stations trouvées",
+    title: "Stations trouvees",
     icon: "mdi-pump",
     color: "primary",
     key: "count",
@@ -22,10 +25,16 @@ const cards = [
     key: "average",
   },
   {
-    title: "Économie maximale",
+    title: "Economie maximale",
     icon: "mdi-piggy-bank-outline",
     color: "accent",
     key: "savings",
+  },
+  {
+    title: "Gain net max",
+    icon: "mdi-cash-fast",
+    color: "secondary",
+    key: "smart-fill",
   },
 ] as const;
 </script>
@@ -36,7 +45,8 @@ const cards = [
       v-for="card in cards"
       :key="card.key"
       cols="12"
-      md="4"
+      md="6"
+      xl="3"
     >
       <v-card class="surface-card pa-4 fill-height">
         <div class="d-flex align-center ga-3">
@@ -62,18 +72,26 @@ const cards = [
               {{ formatPrice(averagePrice) }}
             </div>
             <div
-              v-else
+              v-else-if="card.key === 'savings'"
               class="text-h5 font-weight-bold"
             >
               {{ formatMoney(maxSavings) }}
+            </div>
+            <div
+              v-else
+              class="text-h5 font-weight-bold"
+            >
+              {{ formatMoney(maxNetSavings) }}
             </div>
             <p class="text-caption mb-0 text-medium-emphasis">
               {{
                 card.key === "count"
                   ? `${comparableCount} comparables pour le carburant choisi`
                   : card.key === "average"
-                    ? "Calculé sur les stations visibles"
-                    : "Par litre face au prix moyen local"
+                    ? `${formatFreshness(freshestPriceUpdate)}`
+                    : card.key === "savings"
+                      ? "Par litre face au prix moyen local"
+                      : `Apres detour estime • ${staleCount} station(s) potentiellement stale(s)`
               }}
             </p>
           </div>

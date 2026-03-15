@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [string]$Server = $(if ($env:FUELFLASH_DEPLOY_SERVER) { $env:FUELFLASH_DEPLOY_SERVER } else { "ubuntu@145.241.164.91" }),
+  [string]$Server = $(if ($env:FUELFLASH_DEPLOY_SERVER) { $env:FUELFLASH_DEPLOY_SERVER } else { "" }),
   [switch]$DryRun,
   [string]$KeyPath = $(if ($env:FUELFLASH_DEPLOY_KEY) {
       $env:FUELFLASH_DEPLOY_KEY
@@ -27,7 +27,11 @@ $scriptRoot = if ($PSScriptRoot) {
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot ".."))
 
 if ([string]::IsNullOrWhiteSpace($KeyPath)) {
-  $KeyPath = Join-Path $repoRoot ".local\\ssh\\ssh-key-2026-03-11.key"
+  throw "FUELFLASH_DEPLOY_KEY or -KeyPath is required."
+}
+
+if ([string]::IsNullOrWhiteSpace($Server)) {
+  throw "FUELFLASH_DEPLOY_SERVER or -Server is required."
 }
 
 $archivePath = Join-Path $repoRoot "dist.tar.gz"

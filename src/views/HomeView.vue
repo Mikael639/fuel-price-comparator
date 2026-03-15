@@ -7,6 +7,7 @@ import SectionHeading from "@/components/common/SectionHeading.vue";
 import FilterBar from "@/components/filters/FilterBar.vue";
 import StationsMap from "@/components/map/StationsMap.vue";
 import BestStationCard from "@/components/station/BestStationCard.vue";
+import FavoriteAlertsPanel from "@/components/station/FavoriteAlertsPanel.vue";
 import StationCard from "@/components/station/StationCard.vue";
 import StationStats from "@/components/station/StationStats.vue";
 import { useStationsBootstrap } from "@/composables/useStationsBootstrap";
@@ -21,6 +22,7 @@ const {
   locationLabel,
   locationSource,
   isLoading,
+  isHydratingHistory,
   isGeolocating,
   isSearchingLocation,
   geoError,
@@ -31,6 +33,9 @@ const {
   openOnly,
   selectedServices,
   sortMode,
+  tankVolumeLiters,
+  consumptionLitersPer100Km,
+  favoriteAlertPrice,
   manualLocationId,
   searchQuery,
   geocodingResults,
@@ -38,6 +43,7 @@ const {
   nearbyStations,
   bestStation,
   favoriteStations,
+  favoriteAlerts,
   stats,
   hasResults,
   hasComparableResults,
@@ -49,8 +55,10 @@ const mapSnackbarMessage = ref("");
 const hasHydratedView = ref(false);
 
 const savingsHero = computed(() =>
-  stats.value.maxSavings != null && bestStation.value
-    ? `Jusqu'a ${stats.value.maxSavings.toFixed(2).replace(".", ",")} EUR d'economie par litre sur ${selectedFuel.value}.`
+  sortMode.value === "smartFill" && stats.value.maxNetSavings != null && bestStation.value
+    ? `Jusqu'a ${stats.value.maxNetSavings.toFixed(2).replace(".", ",")} EUR nets sur ${tankVolumeLiters.value}L avec le mode plein malin.`
+    : stats.value.maxSavings != null && bestStation.value
+      ? `Jusqu'a ${stats.value.maxSavings.toFixed(2).replace(".", ",")} EUR d'economie par litre sur ${selectedFuel.value}.`
     : "Affinez vos filtres pour faire ressortir l'offre la plus interessante autour de vous.",
 );
 
@@ -109,6 +117,19 @@ const favoritesSummary = computed(() => {
   }
 
   return `${favoriteStations.value.length} station(s) favorite(s) dans le rayon courant`;
+});
+
+const freshnessSummary = computed(() => {
+  if (!stats.value.freshestPriceUpdate) {
+    return null;
+  }
+
+  const staleCopy =
+    stats.value.staleCount > 0
+      ? ` ${stats.value.staleCount} station(s) affichent une mise a jour vieille de plus de 24h.`
+      : "";
+
+  return `Le jeu ${selectedFuel.value} a ete rafraichi recemment dans la zone visible.${staleCopy}`;
 });
 
 const discoveryCards = [
@@ -244,6 +265,16 @@ watch(
     </v-alert>
 
     <v-alert
+      v-if="freshnessSummary"
+      class="mb-6"
+      color="secondary"
+      icon="mdi-timer-sand"
+      variant="tonal"
+    >
+      {{ freshnessSummary }}
+    </v-alert>
+
+    <v-alert
       v-if="genericError"
       class="mb-6"
       color="error"
@@ -251,6 +282,16 @@ watch(
       variant="tonal"
     >
       {{ genericError }}
+    </v-alert>
+
+    <v-alert
+      v-if="isHydratingHistory"
+      class="mb-6"
+      color="info"
+      icon="mdi-chart-timeline-variant"
+      variant="tonal"
+    >
+      Historique officiel en cours de chargement pour affiner les tendances locales.
     </v-alert>
 
     <section
@@ -301,17 +342,23 @@ watch(
       >
         <FilterBar
           :fuel-options="FUEL_TYPES"
+          :favorite-alert-price="favoriteAlertPrice"
           :open-only="openOnly"
           :radius-km="radiusKm"
+          :consumption-liters-per100-km="consumptionLitersPer100Km"
           :selected-fuel="selectedFuel"
           :selected-services="selectedServices"
           :service-options="availableServices"
           :sort-mode="sortMode"
+          :tank-volume-liters="tankVolumeLiters"
           @update:open-only="(value) => (stationStore.openOnly = value)"
           @update:radius-km="(value) => (stationStore.radiusKm = value)"
+          @update:consumption-liters-per100-km="(value) => (stationStore.consumptionLitersPer100Km = value)"
+          @update:favorite-alert-price="(value) => (stationStore.favoriteAlertPrice = value)"
           @update:selected-fuel="(value) => (stationStore.selectedFuel = value)"
           @update:selected-services="(value) => (stationStore.selectedServices = value)"
           @update:sort-mode="(value) => (stationStore.sortMode = value)"
+          @update:tank-volume-liters="(value) => (stationStore.tankVolumeLiters = value)"
         />
       </section>
 
@@ -322,9 +369,19 @@ watch(
         <StationStats
           :average-price="stats.averagePrice"
           :comparable-count="stats.comparableCount"
+          :freshest-price-update="stats.freshestPriceUpdate"
           :max-savings="stats.maxSavings"
+          :max-net-savings="stats.maxNetSavings"
+          :stale-count="stats.staleCount"
           :station-count="stats.stationCount"
         />
+      </section>
+
+      <section
+        v-if="favoriteAlerts.length > 0"
+        class="mb-6"
+      >
+        <FavoriteAlertsPanel :alerts="favoriteAlerts" />
       </section>
 
       <section

@@ -16,11 +16,17 @@ export interface ApiStationRecord {
   horaires_jour?: string | null;
   horaires_automate_24_24?: string | null;
   sp95_prix?: number | null;
+  sp95_maj?: string | null;
   sp98_prix?: number | null;
+  sp98_maj?: string | null;
   gazole_prix?: number | null;
+  gazole_maj?: string | null;
   e85_prix?: number | null;
+  e85_maj?: string | null;
   gplc_prix?: number | null;
+  gplc_maj?: string | null;
   e10_prix?: number | null;
+  e10_maj?: string | null;
   carburants_disponibles?: string[] | null;
   carburants_indisponibles?: string[] | null;
 }
@@ -50,8 +56,34 @@ interface CacheEntry<T> {
   value: T;
 }
 
-const stationSelect =
-  "id,adresse,ville,cp,geom,services_service,horaires,horaires_jour,horaires_automate_24_24,sp95_prix,sp98_prix,gazole_prix,e85_prix,gplc_prix,e10_prix,carburants_disponibles,carburants_indisponibles";
+const stationSelect = [
+  "id",
+  "adresse",
+  "ville",
+  "cp",
+  "geom",
+  "services_service",
+  "horaires",
+  "horaires_jour",
+  "horaires_automate_24_24",
+  "sp95_prix",
+  "sp95_maj",
+  "sp98_prix",
+  "sp98_maj",
+  "gazole_prix",
+  "gazole_maj",
+  "e85_prix",
+  "e85_maj",
+  "gplc_prix",
+  "gplc_maj",
+  "e10_prix",
+  "e10_maj",
+  "carburants_disponibles",
+  "carburants_indisponibles",
+].join(",");
+
+const HISTORY_LIMIT_PER_STATION = 45;
+const HISTORY_BATCH_SIZE = 25;
 
 const buildNearbyUrl = (position: Coordinates, radiusKm: number) => {
   const params = new URLSearchParams({
@@ -83,6 +115,28 @@ const buildDailyHistoryUrl = (id: string) => {
 
   return `${appConfig.fuelApi.dailyHistoryUrl}?${params.toString()}`;
 };
+
+const buildDailyHistoryBatchUrl = (ids: string[]) => {
+  const params = new URLSearchParams({
+    limit: String(ids.length * HISTORY_LIMIT_PER_STATION),
+    select: "id,prix_nom,prix_valeur,prix_maj",
+    where: `(${ids.map((id) => `id=${id}`).join(" OR ")})`,
+    order_by: "prix_maj desc",
+  });
+
+  return `${appConfig.fuelApi.dailyHistoryUrl}?${params.toString()}`;
+};
+
+const chunkArray = <T>(items: T[], size: number) =>
+  items.reduce<T[][]>((chunks, item, index) => {
+    if (index % size === 0) {
+      chunks.push([item]);
+      return chunks;
+    }
+
+    chunks[chunks.length - 1]?.push(item);
+    return chunks;
+  }, []);
 
 class FuelApiService {
   private readonly nearbyCache = new Map<string, CacheEntry<ApiStationRecord[]>>();
@@ -146,7 +200,7 @@ class FuelApiService {
     const payload = await fetchJson<ApiRecordsResponse>(requestUrl, {
       signal: options?.signal,
       timeoutMs: appConfig.fuelApi.timeoutMs,
-      errorMessage: "La station demand\u00e9e est indisponible dans l'API officielle.",
+      errorMessage: "La station demandee est indisponible dans l'API officielle.",
     });
 
     const result = payload.results?.[0] ?? null;
@@ -171,6 +225,38 @@ class FuelApiService {
     const results = payload.results ?? [];
     this.setCachedValue(this.dailyHistoryCache, requestUrl, results, appConfig.fuelApi.historyCacheTtlMs);
     return results;
+  }
+
+  async getDailyHistoryForStations(ids: string[], options?: RequestOptions) {
+    const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const batches = chunkArray(uniqueIds, HISTORY_BATCH_SIZE);
+    const responses = await Promise.all(
+      batches.map(async (batch) => {
+        const requestUrl = buildDailyHistoryBatchUrl(batch);
+        const cachedValue = options?.forceRefresh ? null : this.getCachedValue(this.dailyHistoryCache, requestUrl);
+
+        if (cachedValue) {
+          return cachedValue;
+        }
+
+        const payload = await fetchJson<DailyHistoryResponse>(requestUrl, {
+          signal: options?.signal,
+          timeoutMs: appConfig.fuelApi.timeoutMs,
+          errorMessage: "L'historique officiel des prix est indisponible.",
+        });
+
+        const results = payload.results ?? [];
+        this.setCachedValue(this.dailyHistoryCache, requestUrl, results, appConfig.fuelApi.historyCacheTtlMs);
+        return results;
+      }),
+    );
+
+    return responses.flat();
   }
 }
 

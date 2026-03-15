@@ -12,6 +12,13 @@ export interface EuropeFuelMarket {
   snapshots: EuropeFuelSnapshot[];
 }
 
+export interface EuropeFuelMarketsPayload {
+  markets: EuropeFuelMarket[];
+  source: "live" | "fallback";
+  updatedAt: string | null;
+  sourceLabel: string;
+}
+
 export const europeFuelMarkets: EuropeFuelMarket[] = [
   {
     code: "FR",

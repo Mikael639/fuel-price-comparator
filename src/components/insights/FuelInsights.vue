@@ -11,11 +11,16 @@ import {
   type ChartData,
   type ChartOptions,
 } from "chart.js";
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { Bar, Line } from "vue-chartjs";
-import { europeFuelMarkets } from "@/data/europeFuelSnapshots";
+import {
+  europeFuelMarkets,
+  type EuropeFuelMarket,
+  type EuropeFuelMarketsPayload,
+} from "@/data/europeFuelSnapshots";
+import { europeFuelService } from "@/services/europeFuelService";
 import { stationService } from "@/services/stationService";
-import { formatDateLabel, formatMoney, formatPrice, trendCopy } from "@/utils/format";
+import { formatDateLabel, formatDateTime, formatMoney, formatPrice, trendCopy } from "@/utils/format";
 import type { FuelType, StationWithMetrics } from "@/types/station";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -27,15 +32,24 @@ const props = defineProps<{
 }>();
 
 const selectedCountryCode = ref("FR");
+const europePayload = ref<EuropeFuelMarketsPayload>({
+  markets: europeFuelMarkets,
+  source: "fallback",
+  updatedAt: europeFuelMarkets[0]?.snapshots.at(-1)?.date ?? null,
+  sourceLabel: "Snapshots locaux integres",
+});
+const isLoadingEurope = ref(false);
+
 const showLocal = computed(() => props.mode !== "europe");
 const showEurope = computed(() => props.mode !== "local");
+const europeMarkets = computed<EuropeFuelMarket[]>(() => europePayload.value.markets);
 
 const localWeeklyTrend = computed(() => stationService.getAreaWeeklyFuelTrend(props.stations, props.selectedFuel));
 const localTrendDirection = computed(() => stationService.getPriceTrendFromSeries(localWeeklyTrend.value.prices));
 const localComparator = computed(() => stationService.getDieselEssenceComparator(props.stations));
 const localFuelComparison = computed(() => stationService.getAreaFuelComparison(props.stations));
 const selectedMarket = computed(
-  () => europeFuelMarkets.find((market) => market.code === selectedCountryCode.value) ?? europeFuelMarkets[0]!,
+  () => europeMarkets.value.find((market) => market.code === selectedCountryCode.value) ?? europeMarkets.value[0]!,
 );
 const europeComparator = computed(() => stationService.getEuropeDieselEssenceComparator(selectedMarket.value));
 
@@ -49,11 +63,14 @@ const localDelta = computed(() => {
   return last - first;
 });
 
-const localCheapestFuel = computed(() =>
-  localFuelComparison.value
-    .filter((entry) => entry.averagePrice != null)
-    .sort((left, right) => (left.averagePrice ?? Number.POSITIVE_INFINITY) - (right.averagePrice ?? Number.POSITIVE_INFINITY))[0] ??
-  null,
+const localCheapestFuel = computed(
+  () =>
+    localFuelComparison.value
+      .filter((entry) => entry.averagePrice != null)
+      .sort(
+        (left, right) =>
+          (left.averagePrice ?? Number.POSITIVE_INFINITY) - (right.averagePrice ?? Number.POSITIVE_INFINITY),
+      )[0] ?? null,
 );
 
 const europeSeriesLabels = computed(() => selectedMarket.value.snapshots.map((snapshot) => snapshot.date));
@@ -91,7 +108,7 @@ const lineChartOptions = computed<ChartOptions<"line">>(() => ({
   scales: {
     y: {
       ticks: {
-        callback: (value) => `${value} €/L`,
+        callback: (value) => `${value} EUR/L`,
       },
       grid: {
         color: "rgba(148, 163, 184, 0.18)",
@@ -143,7 +160,7 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
   scales: {
     y: {
       ticks: {
-        callback: (value) => `${value} €/L`,
+        callback: (value) => `${value} EUR/L`,
       },
       grid: {
         color: "rgba(148, 163, 184, 0.18)",
@@ -154,6 +171,24 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
     },
   },
 }));
+
+const loadEuropeMarkets = async () => {
+  if (!showEurope.value) {
+    return;
+  }
+
+  isLoadingEurope.value = true;
+
+  try {
+    europePayload.value = await europeFuelService.getMarkets();
+  } finally {
+    isLoadingEurope.value = false;
+  }
+};
+
+onMounted(() => {
+  void loadEuropeMarkets();
+});
 </script>
 
 <template>
@@ -169,7 +204,7 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
             showEurope && showLocal
               ? "Lecture locale sur 7 jours, comparaison Diesel / Essence et ouverture progressive vers l'Europe."
               : showEurope
-                ? "Lecture comparee de plusieurs pays europeens pour garder une vue macro du marche."
+                ? "Lecture comparee de plusieurs pays europeens avec fallback local si la source live est indisponible."
                 : "Lecture locale sur 7 jours avec comparaison Diesel / Essence et panorama multi-carburants."
           }}
         </p>
@@ -232,7 +267,6 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
           </div>
         </v-card>
       </v-col>
-
     </v-row>
 
     <v-row v-if="showLocal">
@@ -333,16 +367,32 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
               <p class="text-overline mb-1">Europe</p>
               <h4 class="text-h6 mb-1">Tendance hebdomadaire {{ selectedMarket.name }}</h4>
               <p class="text-body-2 text-medium-emphasis mb-0">
-                Lecture comparative Diesel / SP95 sur 7 jours pour le pays selectionne.
+                Lecture comparative Diesel / SP95 sur 7 points hebdomadaires pour le pays selectionne.
               </p>
             </div>
-            <v-chip
-              color="secondary"
-              variant="tonal"
-            >
-              {{ selectedMarket.currency }}
-            </v-chip>
+            <div class="d-flex flex-wrap ga-2">
+              <v-chip
+                color="secondary"
+                variant="tonal"
+              >
+                {{ selectedMarket.currency }}
+              </v-chip>
+              <v-chip
+                :color="europePayload.source === 'live' ? 'success' : 'warning'"
+                variant="tonal"
+              >
+                {{ europePayload.source === "live" ? "Source live" : "Fallback local" }}
+              </v-chip>
+            </div>
           </div>
+
+          <v-alert
+            class="mb-4"
+            :color="europePayload.source === 'live' ? 'success' : 'info'"
+            variant="tonal"
+          >
+            {{ europePayload.sourceLabel }}<span v-if="europePayload.updatedAt"> • mis a jour {{ formatDateTime(europePayload.updatedAt) }}</span>
+          </v-alert>
 
           <div class="fuel-insights__market-summary mb-4">
             <div class="fuel-insights__comparison-row">
@@ -361,7 +411,7 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
 
           <v-select
             class="fuel-insights__country-select mb-4"
-            :items="europeFuelMarkets"
+            :items="europeMarkets"
             item-title="name"
             item-value="code"
             :model-value="selectedCountryCode"
@@ -371,7 +421,16 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
             @update:model-value="(value) => (selectedCountryCode = String(value))"
           />
 
-          <div class="fuel-insights__chart fuel-insights__chart--compact">
+          <div
+            v-if="isLoadingEurope"
+            class="fuel-insights__chart fuel-insights__chart--compact"
+          >
+            <v-skeleton-loader type="image" />
+          </div>
+          <div
+            v-else
+            class="fuel-insights__chart fuel-insights__chart--compact"
+          >
             <Line
               :data="europeSeriesChartData"
               :options="lineChartOptions"
