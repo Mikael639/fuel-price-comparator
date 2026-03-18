@@ -9,6 +9,7 @@ const mockStations: FuelStation[] = [
     name: "Station mock",
     brand: "Mock",
     brandSource: "mock",
+    dataOrigin: "mock",
     address: "1 Rue de Test",
     city: "Paris",
     lat: 48.8566,
@@ -20,6 +21,10 @@ const mockStations: FuelStation[] = [
       Diesel: 1.7,
     },
     priceHistory: {},
+    priceUpdatedAt: {
+      Diesel: "2026-03-11T08:00:00.000Z",
+    },
+    lastUpdatedAt: "2026-03-11T08:00:00.000Z",
     services: ["Toilettes"],
   },
 ];
@@ -52,6 +57,7 @@ vi.mock("@/services/stationService", () => ({
     getStationsAround,
     getStationById: vi.fn(),
     enrichStationHistory: vi.fn(async (station: FuelStation) => station),
+    enrichStationsHistory: vi.fn(async (stations: FuelStation[]) => stations),
     enrichStationBrand: vi.fn(async (station: FuelStation) => station),
     createSearchLocation: (result: GeocodingResult) => ({
       lat: result.lat,
@@ -66,8 +72,12 @@ vi.mock("@/services/stationService", () => ({
       comparableCount: 0,
       averagePrice: null,
       maxSavings: null,
+      maxNetSavings: null,
+      freshestPriceUpdate: null,
+      staleCount: 0,
     }),
     getAvailableServices: () => [],
+    getFavoriteAlerts: () => [],
   },
 }));
 
@@ -144,9 +154,7 @@ describe("useFuelStationsStore", () => {
         signal: expect.any(AbortSignal),
       }),
     );
-    expect(store.geocodingError).toBe(
-      "Aucun r\u00e9sultat de g\u00e9ocodage n'a \u00e9t\u00e9 trouv\u00e9 pour cette recherche.",
-    );
+    expect(store.geocodingError).toBe("Aucun r\u00e9sultat de g\u00e9ocodage n'a \u00e9t\u00e9 trouv\u00e9 pour cette recherche.");
   });
 
   it("stores geocoding results when an address search succeeds", async () => {

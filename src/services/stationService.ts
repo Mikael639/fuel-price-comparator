@@ -5,6 +5,7 @@ import { osmService } from "@/services/osmService";
 import type {
   BrandSource,
   Coordinates,
+  FavoriteAlert,
   FuelPrices,
   FuelStation,
   FuelType,
@@ -51,6 +52,14 @@ const FUEL_TO_API_FIELD: Record<FuelType, keyof ApiStationRecord> = {
   GPL: "gplc_prix",
 };
 
+const FUEL_TO_API_UPDATE_FIELD: Record<FuelType, keyof ApiStationRecord> = {
+  SP95: "sp95_maj",
+  SP98: "sp98_maj",
+  Diesel: "gazole_maj",
+  E85: "e85_maj",
+  GPL: "gplc_maj",
+};
+
 const DAILY_NAME_TO_FUEL: Record<string, FuelType> = {
   Gazole: "Diesel",
   SP95: "SP95",
@@ -77,19 +86,7 @@ const FRENCH_SMALL_WORDS = new Set([
   "sur",
 ]);
 
-const UPPERCASE_TOKENS = new Set([
-  "a",
-  "bp",
-  "cd",
-  "d",
-  "n",
-  "rd",
-  "rn",
-  "za",
-  "zac",
-  "zae",
-  "zi",
-]);
+const UPPERCASE_TOKENS = new Set(["a", "bp", "cd", "d", "n", "rd", "rn", "za", "zac", "zae", "zi"]);
 
 const BRAND_PATTERNS: Array<{ pattern: RegExp; brand: string }> = [
   { pattern: /\bTOTAL(?:ENERGIES)?\b|\bACCESS\b|\bRELAIS\b/i, brand: "TotalEnergies" },
@@ -100,7 +97,7 @@ const BRAND_PATTERNS: Array<{ pattern: RegExp; brand: string }> = [
   { pattern: /\bQ8\b/i, brand: "Q8" },
   { pattern: /\bENI\b|\bAGIP\b/i, brand: "Eni" },
   { pattern: /\bCARREFOUR\b/i, brand: "Carrefour" },
-  { pattern: /\bINTERMARCHE\b/i, brand: "Intermarché" },
+  { pattern: /\bINTERMARCHE\b/i, brand: "Intermarche" },
   { pattern: /\bLECLERC\b|\bE[ .-]?LECLERC\b/i, brand: "E.Leclerc" },
   { pattern: /\bAUCHAN\b/i, brand: "Auchan" },
   { pattern: /\bSUPER U\b|\bU EXPRESS\b|\bHYPER U\b/i, brand: "U" },
@@ -117,13 +114,10 @@ const dayIndexById: Record<string, number> = {
   "7": 0,
 };
 
-const normalizeLabelPart = (value: string | null | undefined) =>
-  value?.replace(/\s+/g, " ").trim() ?? "";
+const normalizeLabelPart = (value: string | null | undefined) => value?.replace(/\s+/g, " ").trim() ?? "";
 
 const capitalizeSegment = (segment: string) =>
-  segment.length > 0
-    ? `${segment.charAt(0).toLocaleUpperCase("fr-FR")}${segment.slice(1)}`
-    : segment;
+  segment.length > 0 ? `${segment.charAt(0).toLocaleUpperCase("fr-FR")}${segment.slice(1)}` : segment;
 
 const humanizeWord = (word: string, index: number) => {
   const raw = word.trim();
@@ -170,6 +164,15 @@ const humanizeWord = (word: string, index: number) => {
   return index > 0 && FRENCH_SMALL_WORDS.has(lower) ? lower : transformed;
 };
 
+const getCurrentPricePointDate = (fuel: FuelType, priceUpdatedAt: Partial<Record<FuelType, string>>) =>
+  priceUpdatedAt[fuel] ?? new Date().toISOString();
+
+const getLatestUpdate = (priceUpdatedAt: Partial<Record<FuelType, string>>) =>
+  Object.values(priceUpdatedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1) ?? null;
+
 export const normalizeOfficialText = (value: string | null | undefined) => {
   const normalized = normalizeLabelPart(value);
 
@@ -212,7 +215,7 @@ const normalizeService = (service: string): ServiceType | null => {
     normalized.includes("recharge") ||
     normalized.includes("borne") ||
     normalized.includes("electrique") ||
-    normalized.includes("électrique")
+    normalized.includes("Ã©lectrique")
   ) {
     return "Borne de recharge";
   }
@@ -236,7 +239,7 @@ const inferBrand = (record: ApiStationRecord): { brand: string; brandSource: Bra
   }
 
   return {
-    brand: "Enseigne non communiquée",
+    brand: "Enseigne non communiquee",
     brandSource: "not_provided",
   };
 };
@@ -310,7 +313,7 @@ const parseOpeningHours = (rawHours: string | null | undefined) => {
 
   if (!currentDay || currentDay["@ferme"] === "1") {
     return {
-      openingHours: "Fermée aujourd'hui",
+      openingHours: "Fermee aujourd'hui",
       isOpen: false,
     };
   }
@@ -336,15 +339,10 @@ const parseOpeningHours = (rawHours: string | null | undefined) => {
   });
 
   const isOpen = ranges.some((range) => {
-    const [openingHours, openingMinutes] = normalizeTime(range["@ouverture"])
-      .split(":")
-      .map(Number);
-    const [closingHours, closingMinutes] = normalizeTime(range["@fermeture"])
-      .split(":")
-      .map(Number);
+    const [openingHours, openingMinutes] = normalizeTime(range["@ouverture"]).split(":").map(Number);
+    const [closingHours, closingMinutes] = normalizeTime(range["@fermeture"]).split(":").map(Number);
 
-    return minutesNow >= openingHours * 60 + openingMinutes &&
-      minutesNow <= closingHours * 60 + closingMinutes;
+    return minutesNow >= openingHours * 60 + openingMinutes && minutesNow <= closingHours * 60 + closingMinutes;
   });
 
   return {
@@ -352,39 +350,6 @@ const parseOpeningHours = (rawHours: string | null | undefined) => {
     isOpen,
   };
 };
-
-const createSyntheticHistory = (
-  stationId: string,
-  fuel: FuelType,
-  price: number,
-): PriceHistoryPoint[] => {
-  const days = 7;
-  const hash = `${stationId}:${fuel}`
-    .split("")
-    .reduce((sum, character) => sum + character.charCodeAt(0), 0);
-  const amplitude = ((hash % 4) + 1) * 0.002;
-  const direction = hash % 2 === 0 ? -1 : 1;
-
-  return Array.from({ length: days }, (_, index) => {
-    const currentDate = new Date();
-    currentDate.setDate(currentDate.getDate() - (days - index - 1));
-
-    return {
-      date: currentDate.toISOString(),
-      price: Number((price + direction * amplitude * (3 - index)).toFixed(3)),
-    };
-  });
-};
-
-const buildPriceHistory = (stationId: string, fuelPrices: FuelPrices): PriceHistory =>
-  Object.entries(fuelPrices).reduce<PriceHistory>((history, [fuel, price]) => {
-    if (price == null) {
-      return history;
-    }
-
-    history[fuel as FuelType] = createSyntheticHistory(stationId, fuel as FuelType, price);
-    return history;
-  }, {});
 
 const buildFuelPrices = (record: ApiStationRecord): FuelPrices => {
   const prices: FuelPrices = {};
@@ -400,6 +365,36 @@ const buildFuelPrices = (record: ApiStationRecord): FuelPrices => {
 
   return prices;
 };
+
+const buildPriceUpdatedAt = (record: ApiStationRecord, fuelPrices: FuelPrices) =>
+  (Object.keys(fuelPrices) as FuelType[]).reduce<Partial<Record<FuelType, string>>>((updates, fuel) => {
+    const field = fuel === "SP95" && record.sp95_prix == null ? "e10_maj" : FUEL_TO_API_UPDATE_FIELD[fuel];
+    const updatedAt = record[field];
+
+    if (typeof updatedAt === "string" && updatedAt.length > 0) {
+      updates[fuel] = updatedAt;
+    }
+
+    return updates;
+  }, {});
+
+const buildCurrentPriceHistory = (
+  fuelPrices: FuelPrices,
+  priceUpdatedAt: Partial<Record<FuelType, string>>,
+): PriceHistory =>
+  Object.entries(fuelPrices).reduce<PriceHistory>((history, [fuel, price]) => {
+    if (price == null) {
+      return history;
+    }
+
+    history[fuel as FuelType] = [
+      {
+        date: getCurrentPricePointDate(fuel as FuelType, priceUpdatedAt),
+        price,
+      },
+    ];
+    return history;
+  }, {});
 
 export const mapRecordToStation = (record: ApiStationRecord): FuelStation | null => {
   if (!record.geom?.lat || !record.geom?.lon) {
@@ -429,6 +424,7 @@ export const mapRecordToStation = (record: ApiStationRecord): FuelStation | null
   const id = String(record.id);
   const { brand, brandSource } = inferBrand(record);
   const city = record.ville ?? "Ville indisponible";
+  const priceUpdatedAt = buildPriceUpdatedAt(record, fuelPrices);
 
   return {
     id,
@@ -441,18 +437,19 @@ export const mapRecordToStation = (record: ApiStationRecord): FuelStation | null
     }),
     brand,
     brandSource,
+    dataOrigin: "official",
     address: normalizeOfficialText(record.adresse) || "Adresse indisponible",
     city: normalizeOfficialText(city) || "Ville indisponible",
     lat: record.geom.lat,
     lng: record.geom.lon,
     isOpen,
     openingHours:
-      openingHours === "Horaires indisponibles"
-        ? normalizeOfficialText(record.horaires_jour) || openingHours
-        : openingHours,
+      openingHours === "Horaires indisponibles" ? normalizeOfficialText(record.horaires_jour) || openingHours : openingHours,
     fuels,
     fuelPrices,
-    priceHistory: buildPriceHistory(id, fuelPrices),
+    priceHistory: buildCurrentPriceHistory(fuelPrices, priceUpdatedAt),
+    priceUpdatedAt,
+    lastUpdatedAt: getLatestUpdate(priceUpdatedAt),
     services: [...new Set(normalizedServices)],
   };
 };
@@ -505,10 +502,7 @@ const mergeHistoryPoints = (history: PriceHistoryPoint[]) =>
       return points.findIndex((candidate) => candidate.date.slice(0, 10) === dayKey) === index;
     });
 
-export const mergeStationHistory = (
-  station: FuelStation,
-  dailyHistory: DailyHistoryRecord[],
-): FuelStation => {
+export const mergeStationHistory = (station: FuelStation, dailyHistory: DailyHistoryRecord[]): FuelStation => {
   const nextHistory: PriceHistory = { ...station.priceHistory };
 
   dailyHistory.forEach((entry) => {
@@ -518,7 +512,7 @@ export const mergeStationHistory = (
       return;
     }
 
-    const existingPoints = nextHistory[fuel] ?? [];
+    const existingPoints = nextHistory[fuel] ? [...(nextHistory[fuel] ?? [])] : [];
     existingPoints.push({
       date: entry.prix_maj,
       price: entry.prix_valeur,
@@ -528,7 +522,7 @@ export const mergeStationHistory = (
 
     if (currentPrice != null) {
       existingPoints.push({
-        date: new Date().toISOString(),
+        date: getCurrentPricePointDate(fuel, station.priceUpdatedAt),
         price: currentPrice,
       });
     }
@@ -542,28 +536,43 @@ export const mergeStationHistory = (
   };
 };
 
+const getDetourFuelCost = (distanceKm: number, fuelPrice: number, consumptionLitersPer100Km: number) =>
+  distanceKm * 2 * (consumptionLitersPer100Km / 100) * fuelPrice;
+
 const buildMetrics = (
   station: FuelStation,
   position: Coordinates,
   fuel: FuelType,
   averagePrice: number | null,
   favoriteIds: string[],
+  tankVolumeLiters: number,
+  consumptionLitersPer100Km: number,
 ): StationWithMetrics => {
   const distanceKm = haversineDistance(position, {
     lat: station.lat,
     lng: station.lng,
   });
   const selectedFuelPrice = station.fuelPrices[fuel] ?? null;
+  const savingsPerLiter =
+    selectedFuelPrice != null && averagePrice != null ? Math.max(averagePrice - selectedFuelPrice, 0) : null;
+  const estimatedFillCost = selectedFuelPrice != null ? selectedFuelPrice * tankVolumeLiters : null;
+  const estimatedDetourCost =
+    selectedFuelPrice != null ? getDetourFuelCost(distanceKm, selectedFuelPrice, consumptionLitersPer100Km) : null;
+  const netSavingsForTank =
+    savingsPerLiter != null && estimatedDetourCost != null
+      ? savingsPerLiter * tankVolumeLiters - estimatedDetourCost
+      : null;
 
   return {
     ...station,
     distanceKm,
     selectedFuelPrice,
     estimatedDriveMinutes: estimateDriveTimeMinutes(distanceKm),
-    savingsPerLiter:
-      selectedFuelPrice != null && averagePrice != null
-        ? Math.max(averagePrice - selectedFuelPrice, 0)
-        : null,
+    savingsPerLiter,
+    fillVolumeLiters: tankVolumeLiters,
+    estimatedFillCost,
+    estimatedDetourCost,
+    netSavingsForTank,
     isFavorite: favoriteIds.includes(station.id),
   };
 };
@@ -581,7 +590,11 @@ export const sortStations = (stations: StationWithMetrics[], sortMode: SortMode)
     }
 
     if (sortMode === "savings") {
-      return (right.savingsPerLiter ?? -1) - (left.savingsPerLiter ?? -1) ||
+      return (right.savingsPerLiter ?? -1) - (left.savingsPerLiter ?? -1) || left.distanceKm - right.distanceKm;
+    }
+
+    if (sortMode === "smartFill") {
+      return (right.netSavingsForTank ?? Number.NEGATIVE_INFINITY) - (left.netSavingsForTank ?? Number.NEGATIVE_INFINITY) ||
         left.distanceKm - right.distanceKm;
     }
 
@@ -603,6 +616,9 @@ export const sortStations = (stations: StationWithMetrics[], sortMode: SortMode)
   return nextStations;
 };
 
+const getFreshnessDate = (station: StationWithMetrics | FuelStation, fuel: FuelType) =>
+  station.priceUpdatedAt[fuel] ?? station.lastUpdatedAt;
+
 class StationService {
   getMockStations() {
     return fuelStations;
@@ -610,9 +626,7 @@ class StationService {
 
   async getStationsAround(position: Coordinates, radiusKm: number, options?: { signal?: AbortSignal }) {
     const records = await fuelApiService.getStationsAround(position, radiusKm, options);
-    const stations = records
-      .map(mapRecordToStation)
-      .filter((station): station is FuelStation => station != null);
+    const stations = records.map(mapRecordToStation).filter((station): station is FuelStation => station != null);
 
     return dedupeStations(stations);
   }
@@ -628,6 +642,29 @@ class StationService {
       return mergeStationHistory(station, dailyHistory);
     } catch {
       return station;
+    }
+  }
+
+  async enrichStationsHistory(stations: FuelStation[], options?: { signal?: AbortSignal }): Promise<FuelStation[]> {
+    if (stations.length === 0) {
+      return stations;
+    }
+
+    try {
+      const dailyHistory = await fuelApiService.getDailyHistoryForStations(
+        stations.map((station) => station.id),
+        options,
+      );
+      const historyByStationId = dailyHistory.reduce<Map<string, DailyHistoryRecord[]>>((grouped, entry) => {
+        const currentEntries = grouped.get(entry.id) ?? [];
+        currentEntries.push(entry);
+        grouped.set(entry.id, currentEntries);
+        return grouped;
+      }, new Map());
+
+      return stations.map((station) => mergeStationHistory(station, historyByStationId.get(station.id) ?? []));
+    } catch {
+      return stations;
     }
   }
 
@@ -672,6 +709,8 @@ class StationService {
     fuel,
     sortMode,
     favoriteIds,
+    tankVolumeLiters,
+    consumptionLitersPer100Km,
   }: StationSearchParams): StationWithMetrics[] {
     const scopedStations = stations
       .map((station) => ({
@@ -680,9 +719,7 @@ class StationService {
       }))
       .filter((station) => station.distanceKm <= radiusKm)
       .filter(({ station }) => !openOnly || station.isOpen)
-      .filter(({ station }) =>
-        services.length === 0 ? true : services.every((service) => station.services.includes(service)),
-      )
+      .filter(({ station }) => (services.length === 0 ? true : services.every((service) => station.services.includes(service))))
       .map(({ station }) => station);
 
     const comparablePrices = scopedStations
@@ -690,20 +727,27 @@ class StationService {
       .filter((price): price is number => price != null);
 
     const averagePrice =
-      comparablePrices.length > 0
-        ? comparablePrices.reduce((sum, price) => sum + price, 0) / comparablePrices.length
-        : null;
+      comparablePrices.length > 0 ? comparablePrices.reduce((sum, price) => sum + price, 0) / comparablePrices.length : null;
 
     return sortStations(
-      scopedStations.map((station) => buildMetrics(station, position, fuel, averagePrice, favoriteIds)),
+      scopedStations.map((station) =>
+        buildMetrics(
+          station,
+          position,
+          fuel,
+          averagePrice,
+          favoriteIds,
+          tankVolumeLiters,
+          consumptionLitersPer100Km,
+        ),
+      ),
       sortMode,
     );
   }
 
   getComparableStations(stations: StationWithMetrics[]) {
     return stations.filter(
-      (station): station is StationWithMetrics & { selectedFuelPrice: number } =>
-        station.selectedFuelPrice != null,
+      (station): station is StationWithMetrics & { selectedFuelPrice: number } => station.selectedFuelPrice != null,
     );
   }
 
@@ -715,8 +759,13 @@ class StationService {
     return this.getComparableStations(sortStations(stations, "price"))[0] ?? null;
   }
 
-  getRecommendedBestStation(stations: StationWithMetrics[], radiusKm: number) {
-    const comparableStations = this.getComparableStations(sortStations(stations, "price"));
+  getBestSmartFillStation(stations: StationWithMetrics[]) {
+    return this.getComparableStations(sortStations(stations, "smartFill"))[0] ?? null;
+  }
+
+  getRecommendedBestStation(stations: StationWithMetrics[], radiusKm: number, sortMode: SortMode = "price") {
+    const rankingMode = sortMode === "smartFill" ? "smartFill" : "price";
+    const comparableStations = this.getComparableStations(sortStations(stations, rankingMode));
 
     if (comparableStations.length === 0) {
       return null;
@@ -734,10 +783,7 @@ class StationService {
       return null;
     }
 
-    return (
-      comparableStations.reduce((sum, station) => sum + station.selectedFuelPrice, 0) /
-      comparableStations.length
-    );
+    return comparableStations.reduce((sum, station) => sum + station.selectedFuelPrice, 0) / comparableStations.length;
   }
 
   getStationSavings(station: StationWithMetrics, averagePrice: number | null) {
@@ -748,11 +794,7 @@ class StationService {
     return Math.max(averagePrice - station.selectedFuelPrice, 0);
   }
 
-  getStationFillSavings(
-    station: StationWithMetrics,
-    averagePrice: number | null,
-    liters = 50,
-  ) {
+  getStationFillSavings(station: StationWithMetrics, averagePrice: number | null, liters = 50) {
     const savingsPerLiter = this.getStationSavings(station, averagePrice);
 
     if (savingsPerLiter == null) {
@@ -760,6 +802,21 @@ class StationService {
     }
 
     return savingsPerLiter * liters;
+  }
+
+  getStationNetSavingsForFill(
+    station: StationWithMetrics,
+    averagePrice: number | null,
+    liters = station.fillVolumeLiters,
+    consumptionLitersPer100Km = 6.5,
+  ) {
+    const fillSavings = this.getStationFillSavings(station, averagePrice, liters);
+
+    if (fillSavings == null || station.selectedFuelPrice == null) {
+      return null;
+    }
+
+    return fillSavings - getDetourFuelCost(station.distanceKm, station.selectedFuelPrice, consumptionLitersPer100Km);
   }
 
   getAreaWeeklyFuelTrend(stations: StationWithMetrics[], fuel: FuelType) {
@@ -786,7 +843,7 @@ class StationService {
       labels,
       prices,
       latestPrice: prices[prices.length - 1] ?? null,
-      seriesCount: stations.filter((station) => (station.priceHistory[fuel] ?? []).length > 0).length,
+      seriesCount: stations.filter((station) => (station.priceHistory[fuel] ?? []).length > 1).length,
     };
   }
 
@@ -818,8 +875,7 @@ class StationService {
 
       return {
         fuel: fuel as FuelType,
-        averagePrice:
-          prices.length > 0 ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null,
+        averagePrice: prices.length > 0 ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null,
         stationCount: prices.length,
       };
     });
@@ -844,11 +900,7 @@ class StationService {
       gapPerLiter:
         dieselAverage != null && gasolineAverage != null ? Math.abs(gasolineAverage - dieselAverage) : null,
       cheaperFuel:
-        dieselAverage == null || gasolineAverage == null
-          ? null
-          : dieselAverage < gasolineAverage
-            ? "Diesel"
-            : "Essence",
+        dieselAverage == null || gasolineAverage == null ? null : dieselAverage < gasolineAverage ? "Diesel" : "Essence",
     };
   }
 
@@ -872,27 +924,43 @@ class StationService {
       gapPerLiter:
         dieselAverage != null && gasolineAverage != null ? Math.abs(gasolineAverage - dieselAverage) : null,
       cheaperFuel:
-        dieselAverage == null || gasolineAverage == null
-          ? null
-          : dieselAverage < gasolineAverage
-            ? "Diesel"
-            : "Essence",
+        dieselAverage == null || gasolineAverage == null ? null : dieselAverage < gasolineAverage ? "Diesel" : "Essence",
     };
   }
 
-  getStats(stations: StationWithMetrics[]): StationStats {
+  getStats(stations: StationWithMetrics[], fuel: FuelType): StationStats {
     const comparableStations = this.getComparableStations(stations);
     const averagePrice = this.getAveragePrice(stations);
     const bestStation = this.getAbsoluteCheapestStation(stations);
+    const comparableNetSavings = comparableStations
+      .map((station) => station.netSavingsForTank)
+      .filter((value): value is number => value != null && Number.isFinite(value));
+    const freshestPriceUpdate =
+      comparableStations
+        .map((station) => getFreshnessDate(station, fuel))
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1) ?? null;
+
+    const staleCount = comparableStations.filter((station) => {
+      const updatedAt = getFreshnessDate(station, fuel);
+
+      if (!updatedAt) {
+        return true;
+      }
+
+      return Date.now() - new Date(updatedAt).getTime() > 24 * 60 * 60 * 1000;
+    }).length;
 
     return {
       stationCount: stations.length,
       comparableCount: comparableStations.length,
       averagePrice,
       maxSavings:
-        bestStation && averagePrice != null
-          ? Math.max(averagePrice - bestStation.selectedFuelPrice, 0)
-          : null,
+        bestStation && averagePrice != null ? Math.max(averagePrice - bestStation.selectedFuelPrice, 0) : null,
+      maxNetSavings: comparableNetSavings.length > 0 ? Math.max(...comparableNetSavings) : null,
+      freshestPriceUpdate,
+      staleCount,
     };
   }
 
@@ -922,6 +990,72 @@ class StationService {
     return [...new Set(stations.flatMap((station) => station.services))].sort((left, right) =>
       left.localeCompare(right),
     ) as ServiceType[];
+  }
+
+  getFavoriteAlerts(
+    stations: StationWithMetrics[],
+    selectedFuel: FuelType,
+    favoriteAlertPrice: number | null,
+  ): FavoriteAlert[] {
+    const favoriteStations = this.getComparableStations(stations.filter((station) => station.isFavorite));
+
+    if (favoriteStations.length === 0) {
+      return [];
+    }
+
+    const alerts: FavoriteAlert[] = [];
+    const bestFavorite = this.getComparableStations(sortStations(favoriteStations, "price"))[0] ?? null;
+    const bestStation = this.getAbsoluteCheapestStation(stations);
+
+    if (favoriteAlertPrice != null) {
+      const matchingFavorites = favoriteStations.filter((station) => station.selectedFuelPrice <= favoriteAlertPrice);
+
+      if (matchingFavorites.length > 0) {
+        alerts.push({
+          id: "favorite-threshold",
+          stationId: matchingFavorites[0]?.id,
+          severity: "success",
+          title: `Alerte ${selectedFuel} atteinte`,
+          description: `${matchingFavorites.length} favorite(s) sont a ${favoriteAlertPrice.toFixed(3)} EUR/L ou moins.`,
+        });
+      }
+    }
+
+    if (bestStation && bestFavorite && bestStation.id !== bestFavorite.id && bestStation.selectedFuelPrice != null) {
+      const priceGap = bestFavorite.selectedFuelPrice - bestStation.selectedFuelPrice;
+
+      if (priceGap >= 0.02) {
+        alerts.push({
+          id: "favorite-better-option",
+          stationId: bestStation.id,
+          severity: "warning",
+          title: "Une station hors favoris est moins chere",
+          description: `${bestStation.name} bat votre meilleure favorite de ${priceGap.toFixed(3)} EUR/L.`,
+        });
+      }
+    } else if (bestStation?.isFavorite) {
+      alerts.push({
+        id: "favorite-best",
+        stationId: bestStation.id,
+        severity: "success",
+        title: "Une favorite domine le rayon",
+        description: `${bestStation.name} est actuellement la meilleure option autour de vous.`,
+      });
+    }
+
+    const bestFavoriteForFill = this.getComparableStations(sortStations(favoriteStations, "smartFill"))[0] ?? null;
+
+    if ((bestFavoriteForFill?.netSavingsForTank ?? 0) > 0) {
+      alerts.push({
+        id: "favorite-smart-fill",
+        stationId: bestFavoriteForFill?.id,
+        severity: "info",
+        title: "Plein malin rentable sur une favorite",
+        description: `${bestFavoriteForFill?.name} peut encore vous faire gagner ${bestFavoriteForFill?.netSavingsForTank?.toFixed(2)} EUR nets sur ${bestFavoriteForFill?.fillVolumeLiters}L.`,
+      });
+    }
+
+    return alerts.slice(0, 3);
   }
 }
 

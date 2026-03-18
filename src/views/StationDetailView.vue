@@ -4,9 +4,10 @@ import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import EmptyStateCard from "@/components/common/EmptyStateCard.vue";
 import SectionHeading from "@/components/common/SectionHeading.vue";
+import { stationService } from "@/services/stationService";
 import PriceHistoryChart from "@/components/station/PriceHistoryChart.vue";
 import { useFuelStationsStore } from "@/stores/fuelStations";
-import { formatDistance, formatDriveTime, formatFuelFillCost, formatPrice } from "@/utils/format";
+import { formatDistance, formatDriveTime, formatFreshness, formatFuelFillCost, formatMoney, formatPrice } from "@/utils/format";
 import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import { haversineDistance } from "@/utils/geo";
 import type { FuelStation, FuelType } from "@/types/station";
@@ -40,6 +41,40 @@ const travelMinutes = computed(() => {
 });
 
 const isFavorite = computed(() => station.value != null && favoriteIds.value.includes(station.value.id));
+const activeFuelFreshness = computed(() =>
+  station.value ? formatFreshness(station.value.priceUpdatedAt[activeFuel.value] ?? station.value.lastUpdatedAt) : null,
+);
+const selectedAreaAveragePrice = computed(() => stationStore.stats.averagePrice);
+const smartFillNetSavings = computed(() => {
+  if (!station.value || travelDistance.value == null) {
+    return null;
+  }
+
+  const selectedFuelPrice = station.value.fuelPrices[activeFuel.value];
+
+  if (selectedFuelPrice == null) {
+    return null;
+  }
+
+  return stationService.getStationNetSavingsForFill(
+    {
+      ...station.value,
+      distanceKm: travelDistance.value,
+      selectedFuelPrice,
+      estimatedDriveMinutes: travelMinutes.value ?? 0,
+      savingsPerLiter:
+        selectedAreaAveragePrice.value != null ? Math.max(selectedAreaAveragePrice.value - selectedFuelPrice, 0) : null,
+      fillVolumeLiters: stationStore.tankVolumeLiters,
+      estimatedFillCost: selectedFuelPrice * stationStore.tankVolumeLiters,
+      estimatedDetourCost: null,
+      netSavingsForTank: null,
+      isFavorite: isFavorite.value,
+    },
+    selectedAreaAveragePrice.value,
+    stationStore.tankVolumeLiters,
+    stationStore.consumptionLitersPer100Km,
+  );
+});
 
 watch(
   station,
@@ -143,6 +178,14 @@ const brandDetail = computed(() => {
                   {{ station.openingHours }}
                 </v-chip>
                 <v-chip
+                  v-if="activeFuelFreshness"
+                  class="soft-chip"
+                  prepend-icon="mdi-timer-outline"
+                  variant="text"
+                >
+                  {{ activeFuelFreshness }}
+                </v-chip>
+                <v-chip
                   v-if="travelDistance != null && travelMinutes != null"
                   class="soft-chip"
                   prepend-icon="mdi-car-clock"
@@ -208,7 +251,7 @@ const brandDetail = computed(() => {
                 {{ formatPrice(station.fuelPrices[fuel]) }}
               </div>
               <p class="text-body-2 text-medium-emphasis mb-1">
-                {{ formatFuelFillCost(station.fuelPrices[fuel]) }}
+                {{ formatFuelFillCost(station.fuelPrices[fuel], stationStore.tankVolumeLiters) }}
               </p>
               <p class="text-body-2 text-medium-emphasis mb-0">
                 Appuyez pour afficher l'historique d\u00e9taill\u00e9.
@@ -269,6 +312,11 @@ const brandDetail = computed(() => {
                   prepend-icon="mdi-map-marker-outline"
                   :subtitle="`${station.address}, ${station.city}`"
                   title="Adresse compl\u00e8te"
+                />
+                <v-list-item
+                  prepend-icon="mdi-cash-fast"
+                  :subtitle="formatMoney(smartFillNetSavings)"
+                  :title="`Gain net estime sur ${stationStore.tankVolumeLiters}L`"
                 />
               </v-list>
             </v-card>

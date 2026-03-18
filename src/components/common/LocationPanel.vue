@@ -65,6 +65,9 @@ const coordinatesLabel = computed(() => {
 const runSearch = () => {
   emit("searchAddress", localSearchQuery.value);
 };
+
+const getManualLocationId = (value: string | MockLocation | null) =>
+  typeof value === "string" ? value : value?.id ?? null;
 </script>
 
 <template>
@@ -140,7 +143,7 @@ const runSearch = () => {
           item-value="id"
           label="Ville de demonstration"
           prepend-inner-icon="mdi-map-search-outline"
-          @update:model-value="(value) => value && emit('selectManual', String(value))"
+          @update:model-value="(value) => getManualLocationId(value) && emit('selectManual', getManualLocationId(value)!)"
         />
 
         <div class="d-flex ga-2 mt-3">

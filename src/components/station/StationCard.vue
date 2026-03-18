@@ -6,6 +6,7 @@ import { useFuelStationsStore } from "@/stores/fuelStations";
 import {
   formatDistance,
   formatDriveTime,
+  formatFreshness,
   formatFuelFillCost,
   formatMoney,
   formatPrice,
@@ -24,9 +25,20 @@ const router = useRouter();
 const stationStore = useFuelStationsStore();
 
 const savings = computed(() => stationService.getStationSavings(props.station, props.averagePrice));
-const fillSavings = computed(() => stationService.getStationFillSavings(props.station, props.averagePrice));
+const fillSavings = computed(() => stationService.getStationFillSavings(props.station, props.averagePrice, props.station.fillVolumeLiters));
+const netSavings = computed(() =>
+  stationService.getStationNetSavingsForFill(
+    props.station,
+    props.averagePrice,
+    props.station.fillVolumeLiters,
+    stationStore.consumptionLitersPer100Km,
+  ),
+);
+const freshnessLabel = computed(() =>
+  formatFreshness(props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt),
+);
 
-const sourceChip = computed(() => (props.station.brandSource === "mock" ? "Dataset local" : "Source officielle"));
+const sourceChip = computed(() => (props.station.dataOrigin === "mock" ? "Dataset local" : "Source officielle"));
 
 const brandMeta = computed(() => {
   if (props.station.brandSource === "osm") {
@@ -34,11 +46,11 @@ const brandMeta = computed(() => {
   }
 
   if (props.station.brandSource === "inferred") {
-    return `Enseigne estim\u00e9e : ${props.station.brand}`;
+    return `Enseigne estimee : ${props.station.brand}`;
   }
 
   if (props.station.brandSource === "not_provided") {
-    return "Enseigne non communiqu\u00e9e";
+    return "Enseigne non communiquee";
   }
 
   return props.station.brand;
@@ -59,14 +71,14 @@ const openDirections = () => {
             color="accent"
             size="small"
           >
-            Meilleur prix
+            Meilleure reco
           </v-chip>
           <v-chip
             :color="station.isOpen ? 'success' : 'error'"
             size="small"
             variant="tonal"
           >
-            {{ station.isOpen ? "Ouverte" : "Ferm\u00e9e" }}
+            {{ station.isOpen ? "Ouverte" : "Fermee" }}
           </v-chip>
           <v-chip
             size="small"
@@ -76,9 +88,10 @@ const openDirections = () => {
           </v-chip>
         </div>
         <h3 class="station-card__title mb-1">{{ station.name }}</h3>
-        <p class="station-card__subtitle mb-0">
+        <p class="station-card__subtitle mb-1">
           {{ brandMeta }} - {{ station.address }}, {{ station.city }}
         </p>
+        <p class="text-caption mb-0">{{ freshnessLabel }}</p>
       </div>
 
       <div class="text-right">
@@ -116,7 +129,7 @@ const openDirections = () => {
         prepend-icon="mdi-piggy-bank-outline"
         variant="text"
       >
-        {{ formatMoney(savings) }} d'\u00e9conomie / L
+        {{ formatMoney(savings) }} / L
       </v-chip>
       <v-chip
         v-if="station.selectedFuelPrice == null"
@@ -134,14 +147,21 @@ const openDirections = () => {
         prepend-icon="mdi-gas-station-outline"
         variant="text"
       >
-        {{ formatFuelFillCost(station.selectedFuelPrice) }}
+        {{ formatFuelFillCost(station.selectedFuelPrice, station.fillVolumeLiters) }}
+      </v-chip>
+      <v-chip
+        class="soft-chip"
+        prepend-icon="mdi-road-variant"
+        variant="text"
+      >
+        Detour estime : {{ formatMoney(station.estimatedDetourCost) }}
       </v-chip>
       <v-chip
         class="soft-chip"
         prepend-icon="mdi-cash-plus"
         variant="text"
       >
-        Gain 50L : {{ formatMoney(fillSavings) }}
+        Gain net : {{ formatMoney(netSavings) }}
       </v-chip>
     </div>
 
@@ -163,7 +183,7 @@ const openDirections = () => {
         variant="tonal"
         @click="router.push({ name: 'station-detail', params: { id: station.id } })"
       >
-        Voir d\u00e9tails
+        Voir details
       </v-btn>
       <v-btn
         color="primary"
@@ -172,6 +192,13 @@ const openDirections = () => {
       >
         Y aller
       </v-btn>
+      <v-chip
+        class="soft-chip"
+        prepend-icon="mdi-cash-fast"
+        variant="text"
+      >
+        Gain brut : {{ formatMoney(fillSavings) }}
+      </v-chip>
     </div>
   </v-card>
 </template>

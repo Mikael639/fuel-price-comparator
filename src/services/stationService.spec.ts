@@ -14,7 +14,8 @@ const baseStation: FuelStation = {
   name: "Station Test",
   brand: "Test",
   brandSource: "mock",
-  address: "12 Avenue de la République",
+  dataOrigin: "mock",
+  address: "12 Avenue de la Republique",
   city: "Juvisy-sur-Orge",
   lat: 48.6899,
   lng: 2.3734,
@@ -31,8 +32,27 @@ const baseStation: FuelStation = {
       { date: "2026-03-11T08:00:00.000Z", price: 1.7 },
     ],
   },
+  priceUpdatedAt: {
+    Diesel: "2026-03-11T08:00:00.000Z",
+    SP95: "2026-03-11T08:00:00.000Z",
+  },
+  lastUpdatedAt: "2026-03-11T08:00:00.000Z",
   services: ["Toilettes"],
 };
+
+const createMetricsStation = (overrides?: Partial<StationWithMetrics>): StationWithMetrics => ({
+  ...baseStation,
+  distanceKm: 4,
+  selectedFuelPrice: 1.7,
+  estimatedDriveMinutes: 9,
+  savingsPerLiter: 0.07,
+  fillVolumeLiters: 50,
+  estimatedFillCost: 85,
+  estimatedDetourCost: 0.88,
+  netSavingsForTank: 2.62,
+  isFavorite: false,
+  ...overrides,
+});
 
 describe("stationService helpers", () => {
   it("humanizes official uppercase labels", () => {
@@ -53,11 +73,13 @@ describe("stationService helpers", () => {
       horaires_automate_24_24: "Oui",
       sp95_prix: 1.8,
       gazole_prix: 1.7,
+      gazole_maj: "2026-03-12T08:00:00.000Z",
     });
 
     expect(station?.city).toBe("Juvisy-sur-Orge");
     expect(station?.services).toContain("Supérette");
     expect(station?.fuelPrices.Diesel).toBe(1.7);
+    expect(station?.priceUpdatedAt.Diesel).toBe("2026-03-12T08:00:00.000Z");
   });
 
   it("deduplicates near-identical stations", () => {
@@ -91,71 +113,63 @@ describe("stationService helpers", () => {
 
   it("sorts stations by savings", () => {
     const stations: StationWithMetrics[] = [
-      {
-        ...baseStation,
-        distanceKm: 4,
+      createMetricsStation({
         selectedFuelPrice: 1.74,
-        estimatedDriveMinutes: 9,
         savingsPerLiter: 0.03,
-        isFavorite: false,
-      },
-      {
-        ...baseStation,
+        netSavingsForTank: 0.55,
+      }),
+      createMetricsStation({
         id: "3",
         distanceKm: 5,
         selectedFuelPrice: 1.7,
         estimatedDriveMinutes: 10,
         savingsPerLiter: 0.07,
-        isFavorite: false,
-      },
+        estimatedFillCost: 85,
+        estimatedDetourCost: 1.1,
+        netSavingsForTank: 2.4,
+      }),
     ];
 
     expect(sortStations(stations, "savings")[0]?.id).toBe("3");
+    expect(sortStations(stations, "smartFill")[0]?.id).toBe("3");
   });
 
   it("computes savings for a 50L fill", () => {
-    const station: StationWithMetrics = {
-      ...baseStation,
-      distanceKm: 4,
-      selectedFuelPrice: 1.7,
-      estimatedDriveMinutes: 9,
-      savingsPerLiter: 0.07,
-      isFavorite: false,
-    };
-
-    expect(stationService.getStationFillSavings(station, 1.77)).toBeCloseTo(3.5);
+    expect(stationService.getStationFillSavings(createMetricsStation(), 1.77)).toBeCloseTo(3.5);
   });
 
   it("aggregates a weekly local trend for a fuel", () => {
-    const station: StationWithMetrics = {
-      ...baseStation,
-      distanceKm: 4,
-      selectedFuelPrice: 1.7,
-      estimatedDriveMinutes: 9,
-      savingsPerLiter: 0.07,
-      isFavorite: false,
-    };
-
-    const trend = stationService.getAreaWeeklyFuelTrend([station], "Diesel");
+    const trend = stationService.getAreaWeeklyFuelTrend([createMetricsStation()], "Diesel");
 
     expect(trend.labels.length).toBeGreaterThanOrEqual(2);
     expect(trend.latestPrice).toBe(1.7);
   });
 
   it("compares diesel and essence averages in the visible area", () => {
-    const station: StationWithMetrics = {
-      ...baseStation,
-      distanceKm: 4,
-      selectedFuelPrice: 1.7,
-      estimatedDriveMinutes: 9,
-      savingsPerLiter: 0.07,
-      isFavorite: false,
-    };
-
-    const comparison = stationService.getDieselEssenceComparator([station]);
+    const comparison = stationService.getDieselEssenceComparator([createMetricsStation()]);
 
     expect(comparison.dieselAverage).toBe(1.7);
     expect(comparison.gasolineAverage).toBe(1.8);
     expect(comparison.cheaperFuel).toBe("Diesel");
+  });
+
+  it("builds favorite alerts from the current area", () => {
+    const stations = [
+      createMetricsStation({
+        isFavorite: true,
+        selectedFuelPrice: 1.69,
+        netSavingsForTank: 2.1,
+      }),
+      createMetricsStation({
+        id: "2",
+        name: "Station moins chere",
+        selectedFuelPrice: 1.65,
+        netSavingsForTank: 3.2,
+      }),
+    ];
+
+    const alerts = stationService.getFavoriteAlerts(stations, "Diesel", 1.7);
+
+    expect(alerts.length).toBeGreaterThan(0);
   });
 });

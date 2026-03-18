@@ -7,7 +7,7 @@ export const SERVICE_TYPES = [
   "Borne de recharge",
   "Station 24h/24",
 ] as const;
-export const SORT_MODES = ["price", "distance", "savings", "favorites"] as const;
+export const SORT_MODES = ["price", "distance", "savings", "smartFill", "favorites"] as const;
 
 export type FuelType = (typeof FUEL_TYPES)[number];
 export type ServiceType = (typeof SERVICE_TYPES)[number];
@@ -16,6 +16,7 @@ export type PriceTrend = "up" | "down" | "stable";
 export type LocationSource = "browser" | "manual" | "demo" | "search" | null;
 export type ThemeName = "fuelLight" | "fuelDark";
 export type BrandSource = "mock" | "inferred" | "osm" | "not_provided";
+export type FavoriteAlertSeverity = "success" | "info" | "warning";
 
 export interface Coordinates {
   lat: number;
@@ -42,6 +43,7 @@ export interface FuelStation {
   name: string;
   brand: string;
   brandSource: BrandSource;
+  dataOrigin: "official" | "mock";
   address: string;
   city: string;
   lat: number;
@@ -51,6 +53,8 @@ export interface FuelStation {
   fuels: FuelType[];
   fuelPrices: FuelPrices;
   priceHistory: PriceHistory;
+  priceUpdatedAt: Partial<Record<FuelType, string>>;
+  lastUpdatedAt: string | null;
   services: ServiceType[];
 }
 
@@ -76,6 +80,10 @@ export interface StationWithMetrics extends FuelStation {
   selectedFuelPrice: number | null;
   estimatedDriveMinutes: number;
   savingsPerLiter: number | null;
+  fillVolumeLiters: number;
+  estimatedFillCost: number | null;
+  estimatedDetourCost: number | null;
+  netSavingsForTank: number | null;
   isFavorite: boolean;
 }
 
@@ -86,6 +94,8 @@ export interface StationFilters {
   services: ServiceType[];
   sortMode: SortMode;
   favoriteIds: string[];
+  tankVolumeLiters: number;
+  consumptionLitersPer100Km: number;
 }
 
 export interface StationSearchParams extends StationFilters {
@@ -98,4 +108,15 @@ export interface StationStats {
   comparableCount: number;
   averagePrice: number | null;
   maxSavings: number | null;
+  maxNetSavings: number | null;
+  freshestPriceUpdate: string | null;
+  staleCount: number;
+}
+
+export interface FavoriteAlert {
+  id: string;
+  stationId?: string;
+  severity: FavoriteAlertSeverity;
+  title: string;
+  description: string;
 }
