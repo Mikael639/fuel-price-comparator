@@ -90,11 +90,12 @@ test("can select a manual location and open a station detail", async ({ page }) 
   await page.goto("/");
 
   await page.getByRole("combobox", { name: /Ville de d.+monstration/i }).click();
-  await page.getByRole("option", { name: "Juvisy-sur-Orge Centre" }).click();
+  await page.getByRole("option", { name: "Choisy-le-Roi" }).click();
 
   await expect(page.getByText("Vos stations favorites")).toHaveCount(0);
+  await expect(page.locator("strong").filter({ hasText: /Choisy-le-Roi/ })).toBeVisible();
   await expect(page.getByText("Liste des stations")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Station Juvisy-sur-Orge/ }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Voir d.+tails/i }).first()).toBeVisible();
 
   await page.getByRole("button", { name: /Voir d.+tails/i }).first().click();
 
