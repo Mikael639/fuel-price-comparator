@@ -14,6 +14,7 @@ import type {
   FuelType,
   GeocodingResult,
   LocationSource,
+  MockLocation,
   PersistedLocation,
   ServiceType,
   SortMode,
@@ -59,6 +60,8 @@ const toCoordinates = (location: PersistedLocation | null): Coordinates | null =
         label: location.label,
       }
     : null;
+
+const getManualLocationId = (value: string | MockLocation) => (typeof value === "string" ? value : value.id);
 
 const isAbortError = (error: unknown) => error instanceof ApiServiceError && error.code === "aborted";
 
@@ -352,8 +355,12 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     void loadStationsForArea(coordinates);
   };
 
-  const selectManualLocation = (locationId: string) => {
-    const location = mockLocations.find((entry) => entry.id === locationId);
+  const selectManualLocation = (locationInput: string | MockLocation) => {
+    const locationId = getManualLocationId(locationInput);
+    const location =
+      typeof locationInput === "string"
+        ? mockLocations.find((entry) => entry.id === locationId)
+        : mockLocations.find((entry) => entry.id === locationId) ?? locationInput;
 
     if (!location) {
       geoError.value = "La position choisie est indisponible.";
