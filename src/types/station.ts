@@ -1,4 +1,5 @@
 export const FUEL_TYPES = ["SP95", "SP98", "Diesel", "E85", "GPL"] as const;
+export const ENERGY_TYPES = ["carburant", "electrique"] as const;
 export const SERVICE_TYPES = [
   "Supérette",
   "Lavage",
@@ -10,6 +11,7 @@ export const SERVICE_TYPES = [
 export const SORT_MODES = ["price", "distance", "savings", "smartFill", "favorites"] as const;
 
 export type FuelType = (typeof FUEL_TYPES)[number];
+export type EnergyType = (typeof ENERGY_TYPES)[number];
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 export type SortMode = (typeof SORT_MODES)[number];
 export type PriceTrend = "up" | "down" | "stable";
@@ -85,17 +87,21 @@ export interface StationWithMetrics extends FuelStation {
   estimatedDetourCost: number | null;
   netSavingsForTank: number | null;
   isFavorite: boolean;
+  priceTrend?: PriceTrend;
+  isConfirmed?: boolean;
 }
 
 export interface StationFilters {
+  energyType: EnergyType;
   fuel: FuelType;
   radiusKm: number;
   openOnly: boolean;
-  services: ServiceType[];
+  selectedServices: ServiceType[];
   sortMode: SortMode;
   favoriteIds: string[];
   tankVolumeLiters: number;
   consumptionLitersPer100Km: number;
+  routeDestination?: string | null;
 }
 
 export interface StationSearchParams extends StationFilters {

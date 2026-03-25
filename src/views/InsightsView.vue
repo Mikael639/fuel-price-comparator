@@ -8,6 +8,7 @@ import { useStationsBootstrap } from "@/composables/useStationsBootstrap";
 const stationStore = useStationsBootstrap();
 const { selectedFuel, nearbyStations, userPosition, hasResults, isLoading, genericError, isDataUnavailable } =
   storeToRefs(stationStore);
+const { radiusKm } = storeToRefs(stationStore);
 </script>
 
 <template>
@@ -47,6 +48,8 @@ const { selectedFuel, nearbyStations, userPosition, hasResults, isLoading, gener
         mode="local"
         :selected-fuel="selectedFuel"
         :stations="nearbyStations"
+        :user-position="userPosition"
+        :radius-km="radiusKm"
       />
     </section>
 

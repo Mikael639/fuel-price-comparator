@@ -21,7 +21,7 @@ import {
 import { europeFuelService } from "@/services/europeFuelService";
 import { stationService } from "@/services/stationService";
 import { formatDateLabel, formatDateTime, formatMoney, formatPrice, trendCopy } from "@/utils/format";
-import type { FuelType, StationWithMetrics } from "@/types/station";
+import type { Coordinates, FuelType, StationWithMetrics } from "@/types/station";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
 
@@ -29,6 +29,8 @@ const props = defineProps<{
   stations: StationWithMetrics[];
   selectedFuel: FuelType;
   mode?: "all" | "local" | "europe";
+  userPosition?: Coordinates | null;
+  radiusKm?: number;
 }>();
 
 const selectedCountryCode = ref("FR");
@@ -44,10 +46,18 @@ const showLocal = computed(() => props.mode !== "europe");
 const showEurope = computed(() => props.mode !== "local");
 const europeMarkets = computed<EuropeFuelMarket[]>(() => europePayload.value.markets);
 
-const localWeeklyTrend = computed(() => stationService.getAreaWeeklyFuelTrend(props.stations, props.selectedFuel));
+const localWeeklyTrend = computed(() =>
+  stationService.getAreaWeeklyFuelTrend(props.stations, props.selectedFuel, {
+    fallbackPosition: props.userPosition ?? null,
+    fallbackRadiusKm: props.radiusKm,
+  }),
+);
 const localTrendDirection = computed(() => stationService.getPriceTrendFromSeries(localWeeklyTrend.value.prices));
 const localComparator = computed(() => stationService.getDieselEssenceComparator(props.stations));
 const localFuelComparison = computed(() => stationService.getAreaFuelComparison(props.stations));
+const hasWeeklyTrendData = computed(
+  () => localWeeklyTrend.value.seriesCount > 0 && localWeeklyTrend.value.prices.length > 1,
+);
 const selectedMarket = computed(
   () => europeMarkets.value.find((market) => market.code === selectedCountryCode.value) ?? europeMarkets.value[0]!,
 );
@@ -284,15 +294,29 @@ onMounted(() => {
               </p>
             </div>
             <v-chip
-              color="primary"
+              :color="localWeeklyTrend.source === 'official' ? 'primary' : 'warning'"
               variant="tonal"
             >
-              {{ localWeeklyTrend.seriesCount }} station(s) exploitees
+              {{
+                localWeeklyTrend.source === "official"
+                  ? `${localWeeklyTrend.seriesCount} station(s) exploitees`
+                  : `${localWeeklyTrend.seriesCount} station(s) mock exploitees`
+              }}
             </v-chip>
           </div>
 
+          <v-alert
+            v-if="hasWeeklyTrendData && localWeeklyTrend.source === 'mock'"
+            class="mb-4"
+            color="warning"
+            icon="mdi-database-refresh-outline"
+            variant="tonal"
+          >
+            Historique officiel local insuffisant dans cette zone. Affichage d'une tendance 7 jours basee sur le dataset local de secours.
+          </v-alert>
+
           <div
-            v-if="localWeeklyTrend.prices.length > 0"
+            v-if="hasWeeklyTrendData"
             class="fuel-insights__chart"
           >
             <Line
@@ -306,7 +330,7 @@ onMounted(() => {
             color="info"
             variant="tonal"
           >
-            Pas assez d'historique local pour afficher le graphique hebdomadaire.
+            Pas assez d'historique local fiable, meme avec le dataset de secours, pour afficher une tendance hebdomadaire sur 7 jours.
           </v-alert>
         </v-card>
       </v-col>

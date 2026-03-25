@@ -145,6 +145,32 @@ describe("stationService helpers", () => {
     expect(trend.latestPrice).toBe(1.7);
   });
 
+  it("falls back to mock history when official local history is insufficient", () => {
+    const trend = stationService.getAreaWeeklyFuelTrend(
+      [
+        createMetricsStation({
+          lat: 48.7648,
+          lng: 2.3924,
+          priceHistory: {
+            Diesel: [{ date: "2026-03-17T08:00:00.000Z", price: 1.7 }],
+          },
+          priceUpdatedAt: {
+            Diesel: "2026-03-17T08:00:00.000Z",
+          },
+          lastUpdatedAt: "2026-03-17T08:00:00.000Z",
+        }),
+      ],
+      "Diesel",
+      {
+        fallbackPosition: { lat: 48.7648, lng: 2.3924 },
+        fallbackRadiusKm: 15,
+      },
+    );
+
+    expect(trend.source).toBe("mock");
+    expect(trend.prices.length).toBeGreaterThan(1);
+  });
+
   it("compares diesel and essence averages in the visible area", () => {
     const comparison = stationService.getDieselEssenceComparator([createMetricsStation()]);
 

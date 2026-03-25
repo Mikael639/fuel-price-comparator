@@ -50,4 +50,11 @@ export const mockLocations: MockLocation[] = [
     lat: 48.7202,
     lng: 2.5394,
   },
+  {
+    id: "juvisy-sur-orge",
+    label: "Juvisy-sur-Orge",
+    city: "Juvisy-sur-Orge",
+    lat: 48.6917,
+    lng: 2.3772,
+  },
 ];

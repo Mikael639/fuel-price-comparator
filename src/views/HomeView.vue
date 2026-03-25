@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import EmptyStateCard from "@/components/common/EmptyStateCard.vue";
+import InfoBanner from "@/components/common/InfoBanner.vue";
 import LocationPanel from "@/components/common/LocationPanel.vue";
 import SectionHeading from "@/components/common/SectionHeading.vue";
 import FilterBar from "@/components/filters/FilterBar.vue";
@@ -48,6 +49,8 @@ const {
   hasResults,
   hasComparableResults,
   isDataUnavailable,
+  energyType,
+  routeDestination,
 } = storeToRefs(stationStore);
 
 const isMapSnackbarVisible = ref(false);
@@ -131,6 +134,47 @@ const freshnessSummary = computed(() => {
 
   return `Le jeu ${selectedFuel.value} a ete rafraichi recemment dans la zone visible.${staleCopy}`;
 });
+
+const infoBannerMessages = computed(() => [
+  {
+    key: "generic-error",
+    message: genericError.value,
+    color: "error" as const,
+    icon: "mdi-alert-circle-outline",
+  },
+  {
+    key: "hydrating-history",
+    message: isHydratingHistory.value
+      ? "Historique officiel en cours de chargement pour affiner les tendances locales."
+      : null,
+    color: "info" as const,
+    icon: "mdi-chart-timeline-variant",
+  },
+  {
+    key: "geolocation-hint",
+    message: geolocationHint.value,
+    color: "info" as const,
+    icon: "mdi-crosshairs-question",
+  },
+  {
+    key: "freshness-summary",
+    message: freshnessSummary.value,
+    color: "secondary" as const,
+    icon: "mdi-timer-sand",
+  },
+  {
+    key: "favorites-summary",
+    message: favoritesSummary.value,
+    color: "accent" as const,
+    icon: "mdi-star-circle",
+  },
+  {
+    key: "source-hint",
+    message: sourceHint.value,
+    color: "secondary" as const,
+    icon: "mdi-database-eye-outline",
+  },
+]);
 
 const discoveryCards = [
   {
@@ -225,74 +269,20 @@ watch(
         :search-query="searchQuery"
         :search-results="geocodingResults"
         :user-position="userPosition"
+        :energy-type="energyType"
+        :route-destination="routeDestination"
         @demo="stationStore.useDemoLocation"
         @locate="stationStore.requestUserLocation"
         @refresh="stationStore.refreshPosition"
         @search-address="stationStore.searchLocations"
         @select-manual="stationStore.selectManualLocation"
         @select-search-result="stationStore.selectSearchLocation"
+        @update:energy-type="(v) => (stationStore.energyType = v)"
+        @update:route-destination="(v) => (stationStore.routeDestination = v)"
       />
     </section>
 
-    <v-alert
-      v-if="geolocationHint"
-      class="mb-6"
-      color="info"
-      icon="mdi-crosshairs-question"
-      variant="tonal"
-    >
-      {{ geolocationHint }}
-    </v-alert>
-
-    <v-alert
-      v-if="sourceHint"
-      class="mb-6"
-      color="secondary"
-      icon="mdi-database-eye-outline"
-      variant="tonal"
-    >
-      {{ sourceHint }}
-    </v-alert>
-
-    <v-alert
-      v-if="favoritesSummary"
-      class="mb-6"
-      color="accent"
-      icon="mdi-star-circle"
-      variant="tonal"
-    >
-      {{ favoritesSummary }}
-    </v-alert>
-
-    <v-alert
-      v-if="freshnessSummary"
-      class="mb-6"
-      color="secondary"
-      icon="mdi-timer-sand"
-      variant="tonal"
-    >
-      {{ freshnessSummary }}
-    </v-alert>
-
-    <v-alert
-      v-if="genericError"
-      class="mb-6"
-      color="error"
-      icon="mdi-alert-circle-outline"
-      variant="tonal"
-    >
-      {{ genericError }}
-    </v-alert>
-
-    <v-alert
-      v-if="isHydratingHistory"
-      class="mb-6"
-      color="info"
-      icon="mdi-chart-timeline-variant"
-      variant="tonal"
-    >
-      Historique officiel en cours de chargement pour affiner les tendances locales.
-    </v-alert>
+    <InfoBanner :messages="infoBannerMessages" />
 
     <section
       v-if="isLoading"
@@ -341,6 +331,7 @@ watch(
         class="mb-6 mb-md-8"
       >
         <FilterBar
+          :energy-type="energyType"
           :fuel-options="FUEL_TYPES"
           :favorite-alert-price="favoriteAlertPrice"
           :open-only="openOnly"
@@ -417,7 +408,11 @@ watch(
           />
         </div>
 
-        <v-row>
+        <transition-group
+          name="station-list"
+          tag="div"
+          class="v-row"
+        >
           <v-col
             v-for="station in favoriteStations"
             :key="station.id"
@@ -431,7 +426,7 @@ watch(
               :station="station"
             />
           </v-col>
-        </v-row>
+        </transition-group>
       </section>
 
       <section
@@ -550,7 +545,11 @@ watch(
           </v-chip>
         </div>
 
-        <v-row>
+        <transition-group
+          name="station-list"
+          tag="div"
+          class="v-row"
+        >
           <v-col
             v-for="station in nearbyStations"
             :key="station.id"
@@ -564,7 +563,7 @@ watch(
               :station="station"
             />
           </v-col>
-        </v-row>
+        </transition-group>
       </section>
 
       <section
@@ -663,5 +662,21 @@ watch(
 
 .v-theme--fuelDark .discovery-card__icon {
   background: rgba(94, 234, 212, 0.12);
+}
+
+.station-list-move,
+.station-list-enter-active,
+.station-list-leave-active {
+  transition: all 0.3s ease;
+}
+
+.station-list-enter-from,
+.station-list-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.station-list-leave-active {
+  position: absolute;
 }
 </style>

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import type {
   Coordinates,
+  EnergyType,
   GeocodingResult,
   LocationSource,
   MockLocation,
@@ -19,6 +20,8 @@ const props = defineProps<{
   searchQuery: string;
   searchResults: GeocodingResult[];
   mockLocations: MockLocation[];
+  energyType: EnergyType;
+  routeDestination: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -28,6 +31,8 @@ const emit = defineEmits<{
   selectManual: [locationId: string];
   searchAddress: [query: string];
   selectSearchResult: [result: GeocodingResult];
+  "update:energyType": [value: EnergyType];
+  "update:routeDestination": [value: string | null];
 }>();
 
 const localSearchQuery = ref(props.searchQuery);
@@ -68,10 +73,47 @@ const runSearch = () => {
 
 const getManualLocationId = (value: string | MockLocation | null) =>
   typeof value === "string" ? value : value?.id ?? null;
+
+const localRouteDestination = ref(props.routeDestination ?? "");
+
+watch(
+  () => props.routeDestination,
+  (value) => {
+    localRouteDestination.value = value ?? "";
+  },
+);
+
+const setEnergy = (type: EnergyType) => {
+  emit("update:energyType", type);
+};
+
+const activeEnergy = computed({
+  get: () => props.energyType,
+  set: (v) => setEnergy(v),
+});
 </script>
 
 <template>
-  <v-card class="glass-card pa-5 pa-md-6">
+  <div class="d-flex flex-column ga-6">
+    <v-card class="energy-selector-card mb-4" variant="flat">
+      <div class="px-4 pt-2 text-overline">Type d'énergie</div>
+      <v-btn-toggle
+        v-model="activeEnergy"
+        mandatory
+        color="primary"
+        variant="text"
+        class="w-100"
+      >
+        <v-btn value="carburant" prepend-icon="mdi-gas-station" block>
+          Carburants
+        </v-btn>
+        <v-btn value="electrique" prepend-icon="mdi-ev-station" block>
+          Électrique
+        </v-btn>
+      </v-btn-toggle>
+    </v-card>
+
+    <v-card class="glass-card pa-5 pa-md-6">
     <div class="d-flex flex-column flex-md-row ga-6 justify-space-between">
       <div class="location-panel__copy">
         <p class="location-panel__eyebrow mb-2">Geolocalisation</p>
@@ -167,6 +209,37 @@ const getManualLocationId = (value: string | MockLocation | null) =>
           </v-btn>
         </div>
 
+        <div class="d-flex ga-2 mt-4 pt-4 border-top">
+          <v-text-field
+            v-model="localRouteDestination"
+            class="flex-grow-1"
+            clearable
+            density="comfortable"
+            hide-details
+            label="Calculer un itinéraire (Destination)"
+            prepend-inner-icon="mdi-map-marker-path"
+            @keydown.enter.prevent="emit('update:routeDestination', localRouteDestination)"
+            @click:clear="emit('update:routeDestination', null)"
+          />
+          <v-btn
+            color="secondary"
+            prepend-icon="mdi-route"
+            variant="tonal"
+            @click="emit('update:routeDestination', localRouteDestination)"
+          >
+            Tracer
+          </v-btn>
+        </div>
+
+        <div
+          v-if="routeDestination"
+          class="mt-3 d-flex align-center ga-2 text-info"
+        >
+          <v-icon icon="mdi-information-outline" size="small" />
+          <span class="text-caption">Affichage des stations le long du trajet vers {{ routeDestination }}</span>
+          <v-btn size="x-small" variant="text" color="error" @click="emit('update:routeDestination', null)">Annuler</v-btn>
+        </div>
+
         <v-list
           v-if="searchResults.length > 0"
           class="location-panel__search-results mt-3"
@@ -205,6 +278,7 @@ const getManualLocationId = (value: string | MockLocation | null) =>
       </div>
     </div>
   </v-card>
+  </div>
 </template>
 
 <style scoped>
@@ -267,5 +341,20 @@ const getManualLocationId = (value: string | MockLocation | null) =>
 
 .v-theme--fuelDark .location-panel__search-results {
   background: rgba(13, 31, 39, 0.72);
+}
+.energy-selector-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(15, 118, 110, 0.12);
+  box-shadow: var(--shadow-card);
+}
+
+.energy-toggle {
+  background: transparent !important;
+}
+
+.v-theme--fuelDark .energy-selector-card {
+  background: rgba(13, 31, 39, 0.85) !important;
+  border-color: rgba(148, 163, 184, 0.08);
 }
 </style>

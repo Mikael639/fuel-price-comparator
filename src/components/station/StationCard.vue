@@ -10,6 +10,8 @@ import {
   formatFuelFillCost,
   formatMoney,
   formatPrice,
+  trendColor,
+  trendIcon,
 } from "@/utils/format";
 import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import type { FuelType, StationWithMetrics } from "@/types/station";
@@ -103,8 +105,16 @@ const openDirections = () => {
           @click="stationStore.toggleFavorite(station.id)"
         />
         <p class="text-caption mb-1">{{ selectedFuel }}</p>
-        <div class="station-card__price">
-          {{ formatPrice(station.selectedFuelPrice) }}
+        <div class="station-card__price-wrapper d-flex align-center ga-2 justify-end">
+          <v-icon
+            v-if="station.priceTrend"
+            :color="trendColor[station.priceTrend]"
+            :icon="trendIcon[station.priceTrend]"
+            size="small"
+          />
+          <div class="station-card__price">
+            {{ formatPrice(station.selectedFuelPrice) }}
+          </div>
         </div>
       </div>
     </div>
@@ -191,6 +201,15 @@ const openDirections = () => {
         @click="openDirections"
       >
         Y aller
+      </v-btn>
+      <v-btn
+        :color="stationStore.confirmedStationIds.includes(station.id) ? 'success' : 'secondary'"
+        :disabled="stationStore.confirmedStationIds.includes(station.id)"
+        :prepend-icon="stationStore.confirmedStationIds.includes(station.id) ? 'mdi-check-circle' : 'mdi-check'"
+        variant="tonal"
+        @click="stationStore.confirmStationPrice(station.id)"
+      >
+        {{ stationStore.confirmedStationIds.includes(station.id) ? "Prix confirme" : "Confirmer prix" }}
       </v-btn>
       <v-chip
         class="soft-chip"
