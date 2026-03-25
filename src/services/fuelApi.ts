@@ -82,8 +82,9 @@ const stationSelect = [
   "carburants_indisponibles",
 ].join(",");
 
-const HISTORY_LIMIT_PER_STATION = 45;
-const HISTORY_BATCH_SIZE = 25;
+const MAX_DAILY_HISTORY_RECORDS = 100;
+const HISTORY_LIMIT_PER_STATION = 35;
+const HISTORY_BATCH_SIZE = Math.max(1, Math.floor(MAX_DAILY_HISTORY_RECORDS / HISTORY_LIMIT_PER_STATION));
 
 const buildNearbyUrl = (position: Coordinates, radiusKm: number) => {
   const params = new URLSearchParams({
@@ -107,7 +108,7 @@ const buildStationByIdUrl = (id: string) => {
 
 const buildDailyHistoryUrl = (id: string) => {
   const params = new URLSearchParams({
-    limit: "180",
+    limit: String(MAX_DAILY_HISTORY_RECORDS),
     select: "id,prix_nom,prix_valeur,prix_maj",
     where: `id=${id}`,
     order_by: "prix_maj desc",

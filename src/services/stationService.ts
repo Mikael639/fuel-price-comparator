@@ -44,6 +44,14 @@ interface FuelComparisonEntry {
   stationCount: number;
 }
 
+interface AreaWeeklyFuelTrend {
+  labels: string[];
+  prices: number[];
+  latestPrice: number | null;
+  seriesCount: number;
+  source: "official" | "mock";
+}
+
 const FUEL_TO_API_FIELD: Record<FuelType, keyof ApiStationRecord> = {
   SP95: "sp95_prix",
   SP98: "sp98_prix",
@@ -574,6 +582,7 @@ const buildMetrics = (
     estimatedDetourCost,
     netSavingsForTank,
     isFavorite: favoriteIds.includes(station.id),
+    priceTrend: stationService.getTrend(station, fuel),
   };
 };
 
@@ -618,6 +627,69 @@ export const sortStations = (stations: StationWithMetrics[], sortMode: SortMode)
 
 const getFreshnessDate = (station: StationWithMetrics | FuelStation, fuel: FuelType) =>
   station.priceUpdatedAt[fuel] ?? station.lastUpdatedAt;
+
+const parseHistoryTimestamp = (value: string) => {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const buildAreaWeeklyFuelTrend = (
+  stations: Array<StationWithMetrics | FuelStation>,
+  fuel: FuelType,
+  source: "official" | "mock",
+): AreaWeeklyFuelTrend => {
+  const groupedPrices = new Map<string, number[]>();
+  const now = Date.now();
+
+  const seriesCount = stations.filter((station) => {
+    const uniqueDays = new Set(
+      (station.priceHistory[fuel] ?? [])
+        .map((point) => {
+          const timestamp = parseHistoryTimestamp(point.date);
+
+          if (timestamp == null || timestamp > now) {
+            return null;
+          }
+
+          return point.date.slice(0, 10);
+        })
+        .filter((value): value is string => value != null),
+    );
+
+    return uniqueDays.size > 1;
+  }).length;
+
+  stations.forEach((station) => {
+    const history = station.priceHistory[fuel] ?? [];
+
+    history.forEach((point) => {
+      const timestamp = parseHistoryTimestamp(point.date);
+
+      if (timestamp == null || timestamp > now) {
+        return;
+      }
+
+      const dayKey = point.date.slice(0, 10);
+      const currentValues = groupedPrices.get(dayKey) ?? [];
+      currentValues.push(point.price);
+      groupedPrices.set(dayKey, currentValues);
+    });
+  });
+
+  const labels = [...groupedPrices.keys()].sort().slice(-7);
+  const prices = labels.map((label) => {
+    const values = groupedPrices.get(label) ?? [];
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  });
+
+  return {
+    labels,
+    prices,
+    latestPrice: prices[prices.length - 1] ?? null,
+    seriesCount,
+    source,
+  };
+};
 
 class StationService {
   getMockStations() {
@@ -703,9 +775,10 @@ class StationService {
   findNearbyStations({
     stations,
     position,
+    energyType,
     radiusKm,
     openOnly,
-    services,
+    selectedServices,
     fuel,
     sortMode,
     favoriteIds,
@@ -719,7 +792,10 @@ class StationService {
       }))
       .filter((station) => station.distanceKm <= radiusKm)
       .filter(({ station }) => !openOnly || station.isOpen)
-      .filter(({ station }) => (services.length === 0 ? true : services.every((service) => station.services.includes(service))))
+      .filter(({ station }) =>
+        selectedServices.length === 0 ? true : selectedServices.every((service) => station.services.includes(service)),
+      )
+      .filter(({ station }) => (energyType === "electrique" ? station.services.includes("Borne de recharge") : true))
       .map(({ station }) => station);
 
     const comparablePrices = scopedStations
@@ -819,32 +895,37 @@ class StationService {
     return fillSavings - getDetourFuelCost(station.distanceKm, station.selectedFuelPrice, consumptionLitersPer100Km);
   }
 
-  getAreaWeeklyFuelTrend(stations: StationWithMetrics[], fuel: FuelType) {
-    const groupedPrices = new Map<string, number[]>();
+  getAreaWeeklyFuelTrend(
+    stations: StationWithMetrics[],
+    fuel: FuelType,
+    options?: { fallbackPosition?: Coordinates | null; fallbackRadiusKm?: number },
+  ) {
+    const officialTrend = buildAreaWeeklyFuelTrend(stations, fuel, "official");
 
-    stations.forEach((station) => {
-      const history = station.priceHistory[fuel] ?? [];
+    if (officialTrend.seriesCount > 0 && officialTrend.prices.length > 1) {
+      return officialTrend;
+    }
 
-      history.forEach((point) => {
-        const dayKey = point.date.slice(0, 10);
-        const currentValues = groupedPrices.get(dayKey) ?? [];
-        currentValues.push(point.price);
-        groupedPrices.set(dayKey, currentValues);
-      });
+    if (!options?.fallbackPosition) {
+      return officialTrend;
+    }
+
+    const fallbackRadiusKm = Math.max(options.fallbackRadiusKm ?? appConfig.stations.defaultRadiusKm, 15);
+    const fallbackStations = fuelStations.filter((station) => {
+      if ((station.priceHistory[fuel] ?? []).length < 2) {
+        return false;
+      }
+
+      return haversineDistance(options.fallbackPosition!, { lat: station.lat, lng: station.lng }) <= fallbackRadiusKm;
     });
 
-    const labels = [...groupedPrices.keys()].sort().slice(-7);
-    const prices = labels.map((label) => {
-      const values = groupedPrices.get(label) ?? [];
-      return values.reduce((sum, value) => sum + value, 0) / values.length;
-    });
+    const fallbackTrend = buildAreaWeeklyFuelTrend(fallbackStations, fuel, "mock");
 
-    return {
-      labels,
-      prices,
-      latestPrice: prices[prices.length - 1] ?? null,
-      seriesCount: stations.filter((station) => (station.priceHistory[fuel] ?? []).length > 1).length,
-    };
+    if (fallbackTrend.seriesCount > 0 && fallbackTrend.prices.length > 1) {
+      return fallbackTrend;
+    }
+
+    return officialTrend;
   }
 
   getPriceTrendFromSeries(prices: number[]): PriceTrend {

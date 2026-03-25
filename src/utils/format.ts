@@ -76,6 +76,18 @@ export const trendCopy: Record<PriceTrend, string> = {
   stable: "Stable",
 };
 
+export const trendIcon: Record<PriceTrend, string> = {
+  up: "mdi-trending-up",
+  down: "mdi-trending-down",
+  stable: "mdi-trending-neutral",
+};
+
+export const trendColor: Record<PriceTrend, string> = {
+  up: "error",
+  down: "success",
+  stable: "info",
+};
+
 export const sortModeCopy: Record<SortMode, string> = {
   price: "Prix",
   distance: "Distance",

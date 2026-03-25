@@ -58,8 +58,8 @@ try {
   }
 
   tar -czf $archivePath dist
-  scp -i $KeyPath $archivePath "${Server}:/home/ubuntu/deploy/dist.tar.gz"
-  ssh -i $KeyPath $Server $RemoteDeployCommand
+  scp -o StrictHostKeyChecking=no -i $KeyPath $archivePath "${Server}:/home/ubuntu/deploy/dist.tar.gz"
+  ssh -o StrictHostKeyChecking=no -i $KeyPath $Server $RemoteDeployCommand
 } finally {
   Pop-Location
 }

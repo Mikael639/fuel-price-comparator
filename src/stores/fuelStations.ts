@@ -5,11 +5,12 @@ import { useGeolocation } from "@/composables/useGeolocation";
 import { mockLocations } from "@/data/mockLocations";
 import { ApiServiceError } from "@/services/apiClient";
 import { geocodingService } from "@/services/geocodingService";
-import { stationService } from "@/services/stationService";
+import { stationService, sortStations } from "@/services/stationService";
 import { haversineDistance } from "@/utils/geo";
 import { loadStorage, saveStorage } from "@/utils/storage";
 import type {
   Coordinates,
+  EnergyType,
   FuelStation,
   FuelType,
   GeocodingResult,
@@ -18,10 +19,12 @@ import type {
   PersistedLocation,
   ServiceType,
   SortMode,
+  StationWithMetrics,
   ThemeName,
 } from "@/types/station";
 
 interface PersistedPreferences {
+  energyType: EnergyType;
   selectedFuel: FuelType;
   radiusKm: number;
   openOnly: boolean;
@@ -34,10 +37,12 @@ interface PersistedPreferences {
   consumptionLitersPer100Km: number;
   favoriteAlertPrice: number | null;
   lastLocation: PersistedLocation | null;
+  routeDestination: string | null;
 }
 
 const STORAGE_KEY = "fuel-flash:preferences:v5";
 const defaultPreferences: PersistedPreferences = {
+  energyType: "carburant",
   selectedFuel: "Diesel",
   radiusKm: appConfig.stations.defaultRadiusKm,
   openOnly: false,
@@ -50,6 +55,7 @@ const defaultPreferences: PersistedPreferences = {
   consumptionLitersPer100Km: appConfig.stations.defaultConsumptionLitersPer100Km,
   favoriteAlertPrice: appConfig.stations.defaultFavoriteAlertPrice,
   lastLocation: null,
+  routeDestination: null,
 };
 
 const toCoordinates = (location: PersistedLocation | null): Coordinates | null =>
@@ -78,6 +84,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
   const geocodingError = ref<string | null>(null);
   const genericError = ref<string | null>(null);
   const locationDenied = ref(false);
+  const energyType = ref<EnergyType>(persistedPreferences.energyType ?? "carburant");
   const selectedFuel = ref<FuelType>(persistedPreferences.selectedFuel);
   const radiusKm = ref<number>(persistedPreferences.radiusKm);
   const openOnly = ref<boolean>(persistedPreferences.openOnly);
@@ -92,6 +99,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
   const locationSource = ref<LocationSource>(persistedLocation?.source ?? null);
   const userPosition = ref<Coordinates | null>(toCoordinates(persistedLocation));
   const locationPlaceId = ref<string | null>(persistedLocation?.placeId ?? null);
+  const routeDestination = ref<string | null>(persistedPreferences.routeDestination ?? null);
+  const routePosition = ref<Coordinates | null>(null);
+  const confirmedStationIds = ref<string[]>([]);
   const searchQuery = ref("");
   const geocodingResults = ref<GeocodingResult[]>([]);
 
@@ -109,18 +119,49 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       return [];
     }
 
-    return stationService.findNearbyStations({
+    const originStations = stationService.findNearbyStations({
       stations: stations.value,
       position: userPosition.value,
+      energyType: energyType.value,
       radiusKm: radiusKm.value,
       openOnly: openOnly.value,
-      services: selectedServices.value,
+      selectedServices: selectedServices.value,
       fuel: selectedFuel.value,
       sortMode: sortMode.value,
       favoriteIds: favoriteIds.value,
       tankVolumeLiters: tankVolumeLiters.value,
       consumptionLitersPer100Km: consumptionLitersPer100Km.value,
+      routeDestination: routeDestination.value,
     });
+
+    if (!routePosition.value) {
+      return originStations;
+    }
+
+    const destinationStations = stationService.findNearbyStations({
+      stations: stations.value,
+      position: routePosition.value,
+      energyType: energyType.value,
+      radiusKm: radiusKm.value,
+      openOnly: openOnly.value,
+      selectedServices: selectedServices.value,
+      fuel: selectedFuel.value,
+      sortMode: sortMode.value,
+      favoriteIds: favoriteIds.value,
+      tankVolumeLiters: tankVolumeLiters.value,
+      consumptionLitersPer100Km: consumptionLitersPer100Km.value,
+      routeDestination: routeDestination.value,
+    });
+
+    // Merge and dedupe by ID
+    const merged = [...originStations];
+    destinationStations.forEach((ds: StationWithMetrics) => {
+      if (!merged.find((s: StationWithMetrics) => s.id === ds.id)) {
+        merged.push(ds);
+      }
+    });
+
+    return sortStations(merged, sortMode.value);
   });
 
   const comparableStations = computed(() => stationService.getComparableStations(nearbyStations.value));
@@ -149,6 +190,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
         : null;
 
     saveStorage(STORAGE_KEY, {
+      energyType: energyType.value,
       selectedFuel: selectedFuel.value,
       radiusKm: radiusKm.value,
       openOnly: openOnly.value,
@@ -161,11 +203,13 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       consumptionLitersPer100Km: consumptionLitersPer100Km.value,
       favoriteAlertPrice: favoriteAlertPrice.value,
       lastLocation: nextLocation,
+      routeDestination: routeDestination.value,
     });
   };
 
   watch(
     [
+      energyType,
       selectedFuel,
       radiusKm,
       openOnly,
@@ -180,10 +224,33 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       userPosition,
       locationSource,
       locationPlaceId,
+      routeDestination,
     ],
     persistPreferences,
     { deep: true },
   );
+
+  watch(routeDestination, async (query) => {
+    if (!query) {
+      routePosition.value = null;
+      return;
+    }
+
+    try {
+      const results = await geocodingService.search(query);
+      if (results.length > 0) {
+        routePosition.value = {
+          lat: results[0].lat,
+          lng: results[0].lng,
+          label: results[0].label,
+        };
+        // Also load stations around the destination
+        void loadStationsForArea(routePosition.value);
+      }
+    } catch {
+      routePosition.value = null;
+    }
+  });
 
   watch(radiusKm, () => {
     if (!userPosition.value) {
@@ -509,6 +576,12 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       : [...favoriteIds.value, stationId];
   };
 
+  const confirmStationPrice = (stationId: string) => {
+    if (!confirmedStationIds.value.includes(stationId)) {
+      confirmedStationIds.value.push(stationId);
+    }
+  };
+
   const setTheme = (value: ThemeName) => {
     themeName.value = value;
   };
@@ -527,6 +600,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     geocodingError,
     genericError,
     locationDenied,
+    energyType,
     selectedFuel,
     radiusKm,
     openOnly,
@@ -540,6 +614,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     favoriteIds,
     searchQuery,
     geocodingResults,
+    routeDestination,
+    routePosition,
+    confirmedStationIds,
     availableServices,
     nearbyStations,
     comparableStations,
@@ -560,6 +637,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
     selectSearchLocation,
     refreshPosition,
     toggleFavorite,
+    confirmStationPrice,
     setTheme,
   };
 });

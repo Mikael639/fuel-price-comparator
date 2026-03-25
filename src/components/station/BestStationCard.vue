@@ -10,6 +10,8 @@ import {
   formatFuelFillCost,
   formatMoney,
   formatPrice,
+  trendColor,
+  trendIcon,
 } from "@/utils/format";
 import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import type { FuelType, StationWithMetrics } from "@/types/station";
@@ -141,13 +143,30 @@ const openDirections = () => {
           >
             {{ station.isFavorite ? "Favorite" : "Ajouter aux favorites" }}
           </v-btn>
+          <v-btn
+            :color="stationStore.confirmedStationIds.includes(station.id) ? 'success' : 'white'"
+            :disabled="stationStore.confirmedStationIds.includes(station.id)"
+            :prepend-icon="stationStore.confirmedStationIds.includes(station.id) ? 'mdi-check-circle' : 'mdi-check'"
+            variant="tonal"
+            @click="stationStore.confirmStationPrice(station.id)"
+          >
+            {{ stationStore.confirmedStationIds.includes(station.id) ? "Prix confirme" : "Confirmer prix" }}
+          </v-btn>
         </div>
       </div>
 
       <div class="best-station__price-panel">
         <p class="text-body-2 mb-1">{{ selectedFuel }}</p>
-        <div class="best-station__price mb-2">
-          {{ formatPrice(station.selectedFuelPrice) }}
+        <div class="best-station__price-wrapper d-flex align-center ga-2 mb-2">
+          <v-icon
+            v-if="station.priceTrend"
+            :color="trendColor[station.priceTrend]"
+            :icon="trendIcon[station.priceTrend]"
+            size="large"
+          />
+          <div class="best-station__price">
+            {{ formatPrice(station.selectedFuelPrice) }}
+          </div>
         </div>
         <p class="text-body-2 mb-2 text-medium-emphasis">
           Economie potentielle : <strong>{{ formatMoney(savings) }}</strong> / L
