@@ -40,7 +40,11 @@ const freshnessLabel = computed(() =>
   formatFreshness(props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt),
 );
 
+import { getBrandLogoUrl } from "@/utils/brand";
+
 const sourceChip = computed(() => (props.station.dataOrigin === "mock" ? "Dataset local" : "Source officielle"));
+
+const brandLogo = computed(() => getBrandLogoUrl(props.station.brand));
 
 const brandMeta = computed(() => {
   if (props.station.brandSource === "osm") {
@@ -61,6 +65,13 @@ const brandMeta = computed(() => {
 const openDirections = () => {
   window.open(getGoogleMapsDirectionsUrl(props.station.lat, props.station.lng), "_blank", "noopener,noreferrer");
 };
+
+const isAlertTriggered = computed(() => {
+  if (!props.station.isFavorite || props.station.selectedFuelPrice == null || stationStore.favoriteAlertPrice == null) {
+    return false;
+  }
+  return props.station.selectedFuelPrice <= stationStore.favoriteAlertPrice;
+});
 </script>
 
 <template>
@@ -89,7 +100,12 @@ const openDirections = () => {
             {{ sourceChip }}
           </v-chip>
         </div>
-        <h3 class="station-card__title mb-1">{{ station.name }}</h3>
+        <div class="d-flex align-center ga-3 mb-1">
+          <v-avatar v-if="brandLogo" size="32" rounded="0">
+            <v-img :src="brandLogo" lazy-src="data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==" alt="Logo de l'enseigne" />
+          </v-avatar>
+          <h3 class="station-card__title">{{ station.name }}</h3>
+        </div>
         <p class="station-card__subtitle mb-1">
           {{ brandMeta }} - {{ station.address }}, {{ station.city }}
         </p>
@@ -148,6 +164,15 @@ const openDirections = () => {
         variant="tonal"
       >
         {{ selectedFuel }} indisponible ici
+      </v-chip>
+      
+      <v-chip
+        v-if="isAlertTriggered"
+        color="accent"
+        prepend-icon="mdi-bell-ring"
+        class="pulse-alert"
+      >
+        Victoire ! Prix cible atteint
       </v-chip>
     </div>
 
@@ -252,5 +277,21 @@ const openDirections = () => {
 
 .v-theme--fuelDark .station-card__subtitle {
   color: rgba(226, 247, 241, 0.68);
+}
+
+.pulse-alert {
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 </style>

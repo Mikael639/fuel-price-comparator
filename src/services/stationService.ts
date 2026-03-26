@@ -544,8 +544,12 @@ export const mergeStationHistory = (station: FuelStation, dailyHistory: DailyHis
   };
 };
 
-const getDetourFuelCost = (distanceKm: number, fuelPrice: number, consumptionLitersPer100Km: number) =>
-  distanceKm * 2 * (consumptionLitersPer100Km / 100) * fuelPrice;
+const getDetourFuelCost = (
+  detourKm: number,
+  fuelPrice: number,
+  consumptionLitersPer100Km: number,
+  isRoundTrip: boolean
+) => detourKm * (isRoundTrip ? 2 : 1) * (consumptionLitersPer100Km / 100) * fuelPrice;
 
 const buildMetrics = (
   station: FuelStation,
@@ -555,17 +559,28 @@ const buildMetrics = (
   favoriteIds: string[],
   tankVolumeLiters: number,
   consumptionLitersPer100Km: number,
+  routePosition: Coordinates | null = null,
 ): StationWithMetrics => {
-  const distanceKm = haversineDistance(position, {
-    lat: station.lat,
-    lng: station.lng,
-  });
+  const stationCoords = { lat: station.lat, lng: station.lng };
+  const distanceKm = haversineDistance(position, stationCoords);
+
+  let detourKm = distanceKm;
+  let isRoundTrip = true;
+
+  if (routePosition) {
+    const distOriginToDest = haversineDistance(position, routePosition);
+    const distStationToDest = haversineDistance(stationCoords, routePosition);
+    // Determine the extra distance compared to a straight line from origin to dest
+    detourKm = Math.max(0, (distanceKm + distStationToDest) - distOriginToDest);
+    isRoundTrip = false; // it's a detour on a path, not a round trip from home
+  }
+
   const selectedFuelPrice = station.fuelPrices[fuel] ?? null;
   const savingsPerLiter =
     selectedFuelPrice != null && averagePrice != null ? Math.max(averagePrice - selectedFuelPrice, 0) : null;
   const estimatedFillCost = selectedFuelPrice != null ? selectedFuelPrice * tankVolumeLiters : null;
   const estimatedDetourCost =
-    selectedFuelPrice != null ? getDetourFuelCost(distanceKm, selectedFuelPrice, consumptionLitersPer100Km) : null;
+    selectedFuelPrice != null ? getDetourFuelCost(detourKm, selectedFuelPrice, consumptionLitersPer100Km, isRoundTrip) : null;
   const netSavingsForTank =
     savingsPerLiter != null && estimatedDetourCost != null
       ? savingsPerLiter * tankVolumeLiters - estimatedDetourCost
@@ -573,9 +588,9 @@ const buildMetrics = (
 
   return {
     ...station,
-    distanceKm,
+    distanceKm: routePosition ? detourKm : distanceKm, // If route mode, show detour amount as distance
     selectedFuelPrice,
-    estimatedDriveMinutes: estimateDriveTimeMinutes(distanceKm),
+    estimatedDriveMinutes: estimateDriveTimeMinutes(routePosition ? detourKm : distanceKm),
     savingsPerLiter,
     fillVolumeLiters: tankVolumeLiters,
     estimatedFillCost,
@@ -583,6 +598,7 @@ const buildMetrics = (
     netSavingsForTank,
     isFavorite: favoriteIds.includes(station.id),
     priceTrend: stationService.getTrend(station, fuel),
+    isRouteDetour: !isRoundTrip,
   };
 };
 
@@ -784,6 +800,7 @@ class StationService {
     favoriteIds,
     tankVolumeLiters,
     consumptionLitersPer100Km,
+    routePosition,
   }: StationSearchParams): StationWithMetrics[] {
     const scopedStations = stations
       .map((station) => ({
@@ -815,6 +832,7 @@ class StationService {
           favoriteIds,
           tankVolumeLiters,
           consumptionLitersPer100Km,
+          routePosition,
         ),
       ),
       sortMode,
@@ -892,7 +910,8 @@ class StationService {
       return null;
     }
 
-    return fillSavings - getDetourFuelCost(station.distanceKm, station.selectedFuelPrice, consumptionLitersPer100Km);
+    const isRoundTrip = !station.isRouteDetour;
+    return fillSavings - getDetourFuelCost(station.distanceKm, station.selectedFuelPrice, consumptionLitersPer100Km, isRoundTrip);
   }
 
   getAreaWeeklyFuelTrend(
@@ -960,6 +979,33 @@ class StationService {
         stationCount: prices.length,
       };
     });
+  }
+
+  getAreaBrandComparison(stations: StationWithMetrics[], fuel: FuelType) {
+    const brands = new Map<string, number[]>();
+
+    stations.forEach((station) => {
+      const price = station.fuelPrices[fuel];
+      if (
+        price != null &&
+        station.brand &&
+        station.brand !== "Enseigne non communiquee"
+      ) {
+        const prices = brands.get(station.brand) ?? [];
+        prices.push(price);
+        brands.set(station.brand, prices);
+      }
+    });
+
+    return [...brands.entries()]
+      .map(([brand, prices]) => ({
+        brand,
+        averagePrice: prices.reduce((sum, p) => sum + p, 0) / prices.length,
+        stationCount: prices.length,
+      }))
+      .filter((entry) => entry.stationCount >= 1)
+      .sort((a, b) => a.averagePrice - b.averagePrice)
+      .slice(0, 5); // top 5 cheapest brands
   }
 
   getDieselEssenceComparator(stations: StationWithMetrics[]) {

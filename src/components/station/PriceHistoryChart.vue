@@ -35,17 +35,47 @@ const props = defineProps<{
 const history = computed(() => props.station.priceHistory[props.fuel] ?? []);
 const trend = computed(() => stationService.getTrend(props.station, props.fuel));
 
+const paddedHistory = computed(() => {
+  if (history.value.length === 0) return [];
+  
+  const sorted = [...history.value].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  const days: string[] = [];
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().split("T")[0]);
+  }
+
+  return days.map(dayStr => {
+    const dayEnd = new Date(`${dayStr}T23:59:59.999Z`).getTime();
+    
+    let currentPrice = sorted[0].price;
+    for (const point of sorted) {
+      if (new Date(point.date).getTime() <= dayEnd) {
+        currentPrice = point.price;
+      }
+    }
+    
+    return {
+      date: `${dayStr}T12:00:00Z`,
+      price: currentPrice
+    };
+  });
+});
+
 const chartData = computed<ChartData<"line">>(() => ({
-  labels: history.value.map((point) => formatDateLabel(point.date)),
+  labels: paddedHistory.value.map((point) => formatDateLabel(point.date)),
   datasets: [
     {
       label: props.fuel,
-      data: history.value.map((point) => point.price),
+      data: paddedHistory.value.map((point) => point.price),
       borderColor: "#0f766e",
       backgroundColor: "rgba(15, 118, 110, 0.12)",
       fill: true,
       borderWidth: 3,
-      tension: 0.35,
+      tension: 0.1,
       pointRadius: 3,
       pointHoverRadius: 5,
     },
@@ -63,7 +93,7 @@ const chartOptions = computed<ChartOptions<"line">>(() => ({
   scales: {
     y: {
       ticks: {
-        callback: (value) => `${value} €/L`,
+        callback: (value) => `${Number(value).toFixed(3)} €/L`,
       },
       grid: {
         color: "rgba(148, 163, 184, 0.18)",

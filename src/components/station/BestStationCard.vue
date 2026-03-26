@@ -39,7 +39,11 @@ const freshnessLabel = computed(() =>
   formatFreshness(props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt),
 );
 
+import { getBrandLogoUrl } from "@/utils/brand";
+
 const sourceChip = computed(() => (props.station.dataOrigin === "mock" ? "Dataset local" : "Source officielle"));
+
+const brandLogo = computed(() => getBrandLogoUrl(props.station.brand));
 
 const brandMeta = computed(() => {
   if (props.station.brandSource === "osm") {
@@ -60,6 +64,13 @@ const brandMeta = computed(() => {
 const openDirections = () => {
   window.open(getGoogleMapsDirectionsUrl(props.station.lat, props.station.lng), "_blank", "noopener,noreferrer");
 };
+
+const isAlertTriggered = computed(() => {
+  if (!props.station.isFavorite || props.station.selectedFuelPrice == null || stationStore.favoriteAlertPrice == null) {
+    return false;
+  }
+  return props.station.selectedFuelPrice <= stationStore.favoriteAlertPrice;
+});
 </script>
 
 <template>
@@ -89,7 +100,12 @@ const openDirections = () => {
         </div>
 
         <p class="text-overline mb-2">Station recommandee</p>
-        <h3 class="best-station__title mb-2">{{ station.name }}</h3>
+        <div class="d-flex align-center ga-3 mb-2">
+          <v-avatar v-if="brandLogo" size="48" rounded="0">
+            <v-img :src="brandLogo" lazy-src="data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==" alt="Logo de l'enseigne" />
+          </v-avatar>
+          <h3 class="best-station__title">{{ station.name }}</h3>
+        </div>
         <p class="best-station__meta mb-2">
           {{ brandMeta }} - {{ station.address }}, {{ station.city }}
         </p>
@@ -156,7 +172,18 @@ const openDirections = () => {
       </div>
 
       <div class="best-station__price-panel">
-        <p class="text-body-2 mb-1">{{ selectedFuel }}</p>
+        <p class="text-body-2 mb-1">
+          {{ selectedFuel }}
+          <v-chip
+            v-if="isAlertTriggered"
+            color="white"
+            size="small"
+            class="ml-2 pulse-alert"
+            prepend-icon="mdi-bell-ring"
+          >
+            Alerte cible
+          </v-chip>
+        </p>
         <div class="best-station__price-wrapper d-flex align-center ga-2 mb-2">
           <v-icon
             v-if="station.priceTrend"
@@ -232,5 +259,21 @@ const openDirections = () => {
   font-family: var(--ff-display);
   font-size: 2rem;
   letter-spacing: -0.05em;
+}
+
+.pulse-alert {
+  animation: pulse-glow-white 2s infinite;
+}
+
+@keyframes pulse-glow-white {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
 }
 </style>

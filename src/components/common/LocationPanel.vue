@@ -95,23 +95,33 @@ const activeEnergy = computed({
 
 <template>
   <div class="d-flex flex-column ga-6">
-    <v-card class="energy-selector-card mb-4" variant="flat">
-      <div class="px-4 pt-2 text-overline">Type d'énergie</div>
-      <v-btn-toggle
-        v-model="activeEnergy"
-        mandatory
-        color="primary"
-        variant="text"
-        class="w-100"
-      >
-        <v-btn value="carburant" prepend-icon="mdi-gas-station" block>
+    <div class="mb-4">
+      <div class="px-4 text-overline mb-2">Type d'énergie</div>
+      <div class="d-flex rounded-pill pill-bg pa-1 mx-4">
+        <v-btn
+          class="flex-1-0 rounded-pill elevation-0 text-none font-weight-bold pill-btn"
+          :color="activeEnergy === 'carburant' ? 'primary' : 'transparent'"
+          :class="activeEnergy === 'carburant' ? 'text-white' : 'text-medium-emphasis'"
+          :variant="activeEnergy === 'carburant' ? 'flat' : 'text'"
+          height="44"
+          @click="activeEnergy = 'carburant'"
+        >
+          <v-icon start icon="mdi-gas-station"></v-icon>
           Carburants
         </v-btn>
-        <v-btn value="electrique" prepend-icon="mdi-ev-station" block>
+        <v-btn
+          class="flex-1-0 rounded-pill elevation-0 text-none font-weight-bold pill-btn"
+          :color="activeEnergy === 'electrique' ? 'primary' : 'transparent'"
+          :class="activeEnergy === 'electrique' ? 'text-white' : 'text-medium-emphasis'"
+          :variant="activeEnergy === 'electrique' ? 'flat' : 'text'"
+          height="44"
+          @click="activeEnergy = 'electrique'"
+        >
+          <v-icon start icon="mdi-ev-station"></v-icon>
           Électrique
         </v-btn>
-      </v-btn-toggle>
-    </v-card>
+      </div>
+    </div>
 
     <v-card class="glass-card pa-5 pa-md-6">
     <div class="d-flex flex-column flex-md-row ga-6 justify-space-between">
@@ -342,19 +352,15 @@ const activeEnergy = computed({
 .v-theme--fuelDark .location-panel__search-results {
   background: rgba(13, 31, 39, 0.72);
 }
-.energy-selector-card {
-  background: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  box-shadow: var(--shadow-card);
+.pill-bg {
+  background: rgba(15, 23, 42, 0.04);
 }
 
-.energy-toggle {
-  background: transparent !important;
+.pill-btn {
+  letter-spacing: 0.04em !important;
 }
 
-.v-theme--fuelDark .energy-selector-card {
-  background: rgba(13, 31, 39, 0.85) !important;
-  border-color: rgba(148, 163, 184, 0.08);
+.v-theme--fuelDark .pill-bg {
+  background: rgba(148, 163, 184, 0.08);
 }
 </style>

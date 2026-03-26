@@ -254,7 +254,7 @@ const brandDetail = computed(() => {
                 {{ formatFuelFillCost(station.fuelPrices[fuel], stationStore.tankVolumeLiters) }}
               </p>
               <p class="text-body-2 text-medium-emphasis mb-0">
-                Appuyez pour afficher l'historique d\u00e9taill\u00e9.
+                Appuyez pour afficher l'historique détaillé.
               </p>
             </v-card>
           </v-col>
@@ -276,7 +276,7 @@ const brandDetail = computed(() => {
           >
             <v-card class="surface-card pa-5 fill-height">
               <p class="text-overline mb-2">Services</p>
-              <h3 class="text-h6 section-title mb-4">\u00c9quipements disponibles</h3>
+              <h3 class="text-h6 section-title mb-4">Équipements disponibles</h3>
               <div class="d-flex flex-wrap ga-2">
                 <v-chip
                   v-for="service in station.services"
@@ -305,13 +305,13 @@ const brandDetail = computed(() => {
                 />
                 <v-list-item
                   prepend-icon="mdi-storefront-outline"
-                  :subtitle="station.isOpen ? 'Disponible maintenant' : 'Actuellement ferm\u00e9e'"
+                  :subtitle="station.isOpen ? 'Disponible maintenant' : 'Actuellement fermée'"
                   title="Statut"
                 />
                 <v-list-item
                   prepend-icon="mdi-map-marker-outline"
                   :subtitle="`${station.address}, ${station.city}`"
-                  title="Adresse compl\u00e8te"
+                  title="Adresse complète"
                 />
                 <v-list-item
                   prepend-icon="mdi-cash-fast"
@@ -337,7 +337,7 @@ const brandDetail = computed(() => {
 
     <section v-else>
       <EmptyStateCard
-        description="Cette station n'existe pas ou n'est plus disponible dans les donn\u00e9es officielles."
+        description="Cette station n'existe pas ou n'est plus disponible dans les données officielles."
         icon="mdi-map-marker-question-outline"
         title="Station introuvable"
       >
@@ -346,7 +346,7 @@ const brandDetail = computed(() => {
           prepend-icon="mdi-arrow-left"
           @click="router.push('/')"
         >
-          Retour \u00e0 l'accueil
+          Retour à l'accueil
         </v-btn>
       </EmptyStateCard>
     </section>

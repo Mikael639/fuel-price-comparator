@@ -55,6 +55,7 @@ const localWeeklyTrend = computed(() =>
 const localTrendDirection = computed(() => stationService.getPriceTrendFromSeries(localWeeklyTrend.value.prices));
 const localComparator = computed(() => stationService.getDieselEssenceComparator(props.stations));
 const localFuelComparison = computed(() => stationService.getAreaFuelComparison(props.stations));
+const localBrandComparison = computed(() => stationService.getAreaBrandComparison(props.stations, props.selectedFuel));
 const hasWeeklyTrendData = computed(
   () => localWeeklyTrend.value.seriesCount > 0 && localWeeklyTrend.value.prices.length > 1,
 );
@@ -84,6 +85,24 @@ const localCheapestFuel = computed(
 );
 
 const europeSeriesLabels = computed(() => selectedMarket.value.snapshots.map((snapshot) => snapshot.date));
+const europeAllMarketsChartData = computed<ChartData<"bar">>(() => ({
+  labels: europeMarkets.value.map(m => m.name),
+  datasets: [
+    {
+      label: "Diesel",
+      data: europeMarkets.value.map(m => m.snapshots.at(-1)?.prices.Diesel ?? null),
+      backgroundColor: "#0f766e",
+      borderRadius: 6,
+    },
+    {
+      label: "SP95",
+      data: europeMarkets.value.map(m => m.snapshots.at(-1)?.prices.SP95 ?? null),
+      backgroundColor: "#ffb703",
+      borderRadius: 6,
+    }
+  ]
+}));
+
 const europeSeriesChartData = computed<ChartData<"line">>(() => ({
   labels: europeSeriesLabels.value.map((label) => formatDateLabel(label)),
   datasets: [
@@ -180,6 +199,18 @@ const barChartOptions = computed<ChartOptions<"bar">>(() => ({
       grid: { display: false },
     },
   },
+}));
+
+const brandComparisonChartData = computed<ChartData<"bar">>(() => ({
+  labels: localBrandComparison.value.map((item) => item.brand),
+  datasets: [
+    {
+      label: `Prix moyen (${props.selectedFuel})`,
+      data: localBrandComparison.value.map((item) => item.averagePrice),
+      backgroundColor: ["#14b8a6", "#3b82f6", "#f59e0b", "#8b5cf6", "#ec4899"],
+      borderRadius: 6,
+    },
+  ],
 }));
 
 const loadEuropeMarkets = async () => {
@@ -380,36 +411,59 @@ onMounted(() => {
       </v-col>
     </v-row>
 
+    <v-row v-if="showLocal && localBrandComparison.length > 0" class="mt-1">
+      <v-col cols="12">
+        <v-card class="surface-card pa-4 pa-md-5">
+          <div class="mb-4">
+            <p class="text-overline mb-1">Palmarès des Enseignes</p>
+            <h4 class="text-h6 mb-1">Moyennes locales ({{ selectedFuel }})</h4>
+            <p class="text-body-2 text-medium-emphasis mb-0">
+              Classement des enseignes les moins chères dans la zone visible.
+            </p>
+          </div>
+
+          <div class="fuel-insights__chart fuel-insights__chart--compact mb-4">
+            <Bar
+              :data="brandComparisonChartData"
+              :options="{
+                ...barChartOptions,
+                plugins: { legend: { display: false } },
+                scales: {
+                  ...barChartOptions.scales,
+                  y: { min: Math.max(0, (localBrandComparison[0]?.averagePrice ?? 1) - 0.2) }
+                }
+              } as any"
+            />
+          </div>
+
+          <div class="d-flex flex-wrap ga-2 mt-4">
+            <v-chip
+              v-for="(brand, i) in localBrandComparison"
+              :key="brand.brand"
+              :color="i === 0 ? 'success' : 'default'"
+              :variant="i === 0 ? 'flat' : 'tonal'"
+            >
+              #{{ i + 1 }} {{ brand.brand }} ({{ formatPrice(brand.averagePrice) }})
+            </v-chip>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <v-row
       v-if="showEurope"
       class="mt-1"
     >
-      <v-col cols="12">
-        <v-card class="surface-card pa-4 pa-md-5">
-          <div class="d-flex flex-column flex-md-row justify-space-between align-start align-md-center ga-3 mb-4">
-            <div>
-              <p class="text-overline mb-1">Europe</p>
-              <h4 class="text-h6 mb-1">Tendance hebdomadaire {{ selectedMarket.name }}</h4>
-              <p class="text-body-2 text-medium-emphasis mb-0">
-                Lecture comparative Diesel / SP95 sur 7 points hebdomadaires pour le pays selectionne.
-              </p>
-            </div>
-            <div class="d-flex flex-wrap ga-2">
-              <v-chip
-                color="secondary"
-                variant="tonal"
-              >
-                {{ selectedMarket.currency }}
-              </v-chip>
-              <v-chip
-                :color="europePayload.source === 'live' ? 'success' : 'warning'"
-                variant="tonal"
-              >
-                {{ europePayload.source === "live" ? "Source live" : "Fallback local" }}
-              </v-chip>
-            </div>
+      <v-col cols="12" md="6">
+        <v-card class="surface-card pa-4 pa-md-5 fill-height">
+          <div class="mb-4">
+            <p class="text-overline mb-1">Classement Europe</p>
+            <h4 class="text-h6 mb-1">Prix actuels au litre</h4>
+            <p class="text-body-2 text-medium-emphasis mb-0">
+              Comparatif des prix du Diesel et du SP95 sur les derniers relevés européens. 
+            </p>
           </div>
-
+          
           <v-alert
             class="mb-4"
             :color="europePayload.source === 'live' ? 'success' : 'info'"
@@ -418,18 +472,41 @@ onMounted(() => {
             {{ europePayload.sourceLabel }}<span v-if="europePayload.updatedAt"> • mis a jour {{ formatDateTime(europePayload.updatedAt) }}</span>
           </v-alert>
 
-          <div class="fuel-insights__market-summary mb-4">
-            <div class="fuel-insights__comparison-row">
-              <span>Diesel moyen</span>
-              <strong>{{ formatPrice(europeComparator.dieselAverage) }}</strong>
+          <div
+            v-if="isLoadingEurope"
+            class="fuel-insights__chart"
+          >
+            <v-skeleton-loader type="image" />
+          </div>
+          <div
+            v-else
+            class="fuel-insights__chart"
+          >
+            <Bar
+              :data="europeAllMarketsChartData"
+              :options="{
+                ...barChartOptions, 
+                plugins: { legend: { display: true, position: 'bottom' } },
+              } as ChartOptions<'bar'>"
+            />
+          </div>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" md="6">
+        <v-card class="surface-card pa-4 pa-md-5 fill-height">
+          <div class="d-flex flex-column flex-md-row justify-space-between align-start align-md-center ga-3 mb-4">
+            <div>
+              <p class="text-overline mb-1">Focus Pays</p>
+              <h4 class="text-h6 mb-1">Tendance {{ selectedMarket.name }}</h4>
+              <p class="text-body-2 text-medium-emphasis mb-0">
+                Lecture sur 7 points hebdomadaires pour un pays spécifique.
+              </p>
             </div>
-            <div class="fuel-insights__comparison-row">
-              <span>Essence moyenne</span>
-              <strong>{{ formatPrice(europeComparator.gasolineAverage) }}</strong>
-            </div>
-            <div class="fuel-insights__comparison-row">
-              <span>Pays selectionne</span>
-              <strong>{{ selectedMarket.name }}</strong>
+            <div class="d-flex flex-wrap ga-2">
+              <v-chip color="secondary" variant="tonal">
+                {{ selectedMarket.currency }}
+              </v-chip>
             </div>
           </div>
 
@@ -444,6 +521,17 @@ onMounted(() => {
             variant="solo-filled"
             @update:model-value="(value) => (selectedCountryCode = String(value))"
           />
+
+          <div class="fuel-insights__market-summary mb-4">
+            <div class="fuel-insights__comparison-row">
+              <span>Diesel moyen ({{ selectedMarket.code }})</span>
+              <strong>{{ formatPrice(europeComparator.dieselAverage) }}</strong>
+            </div>
+            <div class="fuel-insights__comparison-row">
+              <span>Essence moyenne ({{ selectedMarket.code }})</span>
+              <strong>{{ formatPrice(europeComparator.gasolineAverage) }}</strong>
+            </div>
+          </div>
 
           <div
             v-if="isLoadingEurope"

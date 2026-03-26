@@ -132,6 +132,7 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       tankVolumeLiters: tankVolumeLiters.value,
       consumptionLitersPer100Km: consumptionLitersPer100Km.value,
       routeDestination: routeDestination.value,
+      routePosition: routePosition.value,
     });
 
     if (!routePosition.value) {
@@ -151,9 +152,9 @@ export const useFuelStationsStore = defineStore("fuel-stations", () => {
       tankVolumeLiters: tankVolumeLiters.value,
       consumptionLitersPer100Km: consumptionLitersPer100Km.value,
       routeDestination: routeDestination.value,
+      routePosition: userPosition.value, // Treat origin as 'destination' relative to station's search anchor
     });
 
-    // Merge and dedupe by ID
     const merged = [...originStations];
     destinationStations.forEach((ds: StationWithMetrics) => {
       if (!merged.find((s: StationWithMetrics) => s.id === ds.id)) {
