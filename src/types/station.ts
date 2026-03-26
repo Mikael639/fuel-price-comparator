@@ -89,6 +89,7 @@ export interface StationWithMetrics extends FuelStation {
   isFavorite: boolean;
   priceTrend?: PriceTrend;
   isConfirmed?: boolean;
+  isRouteDetour?: boolean;
 }
 
 export interface StationFilters {
@@ -106,6 +107,7 @@ export interface StationFilters {
 
 export interface StationSearchParams extends StationFilters {
   position: Coordinates;
+  routePosition?: Coordinates | null;
   stations: FuelStation[];
 }
 
