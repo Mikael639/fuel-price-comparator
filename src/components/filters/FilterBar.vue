@@ -43,7 +43,7 @@ const alertPriceText = computed(() =>
 <template>
   <v-card class="surface-card pa-4 pa-md-5">
     <div class="d-flex flex-column ga-5">
-      <div v-if="energyType === 'carburant'">
+      <div>
         <p class="text-overline mb-2">Filtres Carburants</p>
         <v-chip-group
           :model-value="selectedFuel"
@@ -63,18 +63,6 @@ const alertPriceText = computed(() =>
             {{ fuel }}
           </v-chip>
         </v-chip-group>
-      </div>
-
-      <div v-else>
-        <p class="text-overline mb-2">Mode Électrique Actif</p>
-        <v-alert
-          color="info"
-          density="compact"
-          icon="mdi-ev-station"
-          variant="tonal"
-        >
-          Les stations affichées sont équipées de bornes de recharge.
-        </v-alert>
       </div>
 
       <div class="d-flex flex-column flex-lg-row ga-4 align-start align-lg-center">
