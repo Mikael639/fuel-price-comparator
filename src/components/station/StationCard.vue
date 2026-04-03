@@ -13,7 +13,7 @@ import {
   trendColor,
   trendIcon,
 } from "@/utils/format";
-import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
+import NavigationMenu from "@/components/common/NavigationMenu.vue";
 import type { FuelType, StationWithMetrics } from "@/types/station";
 
 const props = defineProps<{
@@ -40,6 +40,14 @@ const freshnessLabel = computed(() =>
   formatFreshness(props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt),
 );
 
+const isStale = computed(() => {
+  const updatedAt = props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt;
+  if (!updatedAt) {
+    return true;
+  }
+  return Date.now() - new Date(updatedAt).getTime() > 48 * 60 * 60 * 1000;
+});
+
 import { getBrandLogoUrl } from "@/utils/brand";
 
 const sourceChip = computed(() => (props.station.dataOrigin === "mock" ? "Dataset local" : "Source officielle"));
@@ -62,9 +70,6 @@ const brandMeta = computed(() => {
   return props.station.brand;
 });
 
-const openDirections = () => {
-  window.open(getGoogleMapsDirectionsUrl(props.station.lat, props.station.lng), "_blank", "noopener,noreferrer");
-};
 
 const isAlertTriggered = computed(() => {
   if (!props.station.isFavorite || props.station.selectedFuelPrice == null || stationStore.favoriteAlertPrice == null) {
@@ -165,7 +170,15 @@ const isAlertTriggered = computed(() => {
       >
         {{ selectedFuel }} indisponible ici
       </v-chip>
-      
+      <v-chip
+        v-if="isStale"
+        color="warning"
+        prepend-icon="mdi-clock-alert-outline"
+        variant="tonal"
+      >
+        Prix potentiellement obsolète (>48h)
+      </v-chip>
+
       <v-chip
         v-if="isAlertTriggered"
         color="accent"
@@ -220,13 +233,10 @@ const isAlertTriggered = computed(() => {
       >
         Voir details
       </v-btn>
-      <v-btn
-        color="primary"
-        prepend-icon="mdi-navigation-variant-outline"
-        @click="openDirections"
-      >
-        Y aller
-      </v-btn>
+      <NavigationMenu
+        :lat="station.lat"
+        :lng="station.lng"
+      />
       <v-btn
         :color="stationStore.confirmedStationIds.includes(station.id) ? 'success' : 'secondary'"
         :disabled="stationStore.confirmedStationIds.includes(station.id)"

@@ -81,9 +81,12 @@ export const fetchJson = async <T>(input: string, init?: FetchJsonOptions): Prom
       });
     }
 
+    const text = await response.text();
     try {
-      return (await response.json()) as T;
+      return JSON.parse(text) as T;
     } catch {
+      console.error(`[apiClient] La r\u00e9ponse API n'est pas exploitable pour ${input}.`);
+      console.error(`[apiClient] Contenu re\u00e7u (100 premiers car.) : ${text.slice(0, 100)}`);
       throw new ApiServiceError("La r\u00e9ponse API n'est pas exploitable.", {
         code: "invalid_json",
       });

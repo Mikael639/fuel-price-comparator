@@ -95,33 +95,6 @@ const activeEnergy = computed({
 
 <template>
   <div class="d-flex flex-column ga-6">
-    <div class="mb-4">
-      <div class="px-4 text-overline mb-2">Type d'énergie</div>
-      <div class="d-flex rounded-pill pill-bg pa-1 mx-4">
-        <v-btn
-          class="flex-1-0 rounded-pill elevation-0 text-none font-weight-bold pill-btn"
-          :color="activeEnergy === 'carburant' ? 'primary' : 'transparent'"
-          :class="activeEnergy === 'carburant' ? 'text-white' : 'text-medium-emphasis'"
-          :variant="activeEnergy === 'carburant' ? 'flat' : 'text'"
-          height="44"
-          @click="activeEnergy = 'carburant'"
-        >
-          <v-icon start icon="mdi-gas-station"></v-icon>
-          Carburants
-        </v-btn>
-        <v-btn
-          class="flex-1-0 rounded-pill elevation-0 text-none font-weight-bold pill-btn"
-          :color="activeEnergy === 'electrique' ? 'primary' : 'transparent'"
-          :class="activeEnergy === 'electrique' ? 'text-white' : 'text-medium-emphasis'"
-          :variant="activeEnergy === 'electrique' ? 'flat' : 'text'"
-          height="44"
-          @click="activeEnergy = 'electrique'"
-        >
-          <v-icon start icon="mdi-ev-station"></v-icon>
-          Électrique
-        </v-btn>
-      </div>
-    </div>
 
     <v-card class="glass-card pa-5 pa-md-6">
     <div class="d-flex flex-column flex-md-row ga-6 justify-space-between">

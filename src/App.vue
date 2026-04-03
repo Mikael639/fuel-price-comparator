@@ -2,6 +2,7 @@
 import { watch } from "vue";
 import { useTheme } from "vuetify";
 import AppHeader from "@/components/layout/AppHeader.vue";
+import ReloadPrompt from "@/components/common/ReloadPrompt.vue";
 import { useFuelStationsStore } from "@/stores/fuelStations";
 
 const stationStore = useFuelStationsStore();
@@ -36,5 +37,6 @@ watch(
         </transition>
       </router-view>
     </v-main>
+    <ReloadPrompt />
   </v-app>
 </template>
