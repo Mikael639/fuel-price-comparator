@@ -39,6 +39,14 @@ const freshnessLabel = computed(() =>
   formatFreshness(props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt),
 );
 
+const isStale = computed(() => {
+  const updatedAt = props.station.priceUpdatedAt[props.selectedFuel] ?? props.station.lastUpdatedAt;
+  if (!updatedAt) {
+    return true;
+  }
+  return Date.now() - new Date(updatedAt).getTime() > 48 * 60 * 60 * 1000;
+});
+
 import { getBrandLogoUrl } from "@/utils/brand";
 
 const sourceChip = computed(() => (props.station.dataOrigin === "mock" ? "Dataset local" : "Source officielle"));
@@ -112,6 +120,14 @@ const isAlertTriggered = computed(() => {
         <p class="text-body-2 mb-4">{{ freshnessLabel }}</p>
 
         <div class="d-flex flex-wrap ga-2 mb-4">
+          <v-chip
+            v-if="isStale"
+            color="warning"
+            prepend-icon="mdi-clock-alert-outline"
+            variant="tonal"
+          >
+            Prix potentiellement obsolète (>48h)
+          </v-chip>
           <v-chip
             class="soft-chip"
             prepend-icon="mdi-map-marker-distance"
