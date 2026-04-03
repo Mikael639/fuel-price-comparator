@@ -7,8 +7,8 @@ import SectionHeading from "@/components/common/SectionHeading.vue";
 import { stationService } from "@/services/stationService";
 import PriceHistoryChart from "@/components/station/PriceHistoryChart.vue";
 import { useFuelStationsStore } from "@/stores/fuelStations";
+import NavigationMenu from "@/components/common/NavigationMenu.vue";
 import { formatDistance, formatDriveTime, formatFreshness, formatFuelFillCost, formatMoney, formatPrice } from "@/utils/format";
-import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import { haversineDistance } from "@/utils/geo";
 import type { FuelStation, FuelType } from "@/types/station";
 
@@ -96,9 +96,6 @@ onMounted(() => {
   })();
 });
 
-const directionsUrl = computed(() =>
-  station.value ? getGoogleMapsDirectionsUrl(station.value.lat, station.value.lng) : "#",
-);
 
 const sourceEyebrow = computed(() => {
   if (!station.value) {
@@ -205,14 +202,10 @@ const brandDetail = computed(() => {
               >
                 Retour accueil
               </v-btn>
-              <v-btn
-                color="primary"
-                :href="directionsUrl"
-                prepend-icon="mdi-navigation-variant-outline"
-                target="_blank"
-              >
-                Y aller
-              </v-btn>
+              <NavigationMenu
+                :lat="station.lat"
+                :lng="station.lng"
+              />
               <v-btn
                 :color="isFavorite ? 'accent' : 'secondary'"
                 :prepend-icon="isFavorite ? 'mdi-star' : 'mdi-star-outline'"
