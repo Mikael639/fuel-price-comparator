@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, DatabaseZap, Fuel, MapPinOff, MapPinned, SearchX } from "lucide-react";
+import { AlertCircle, BarChart3, ChevronRight, DatabaseZap, Fuel, Globe, MapPinOff, MapPinned, SearchX } from "lucide-react";
+import { Link } from "react-router-dom";
 import { BestStationCard } from "@/components/station/BestStationCard";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { LocationPanel } from "@/components/common/LocationPanel";
@@ -38,12 +39,18 @@ export const HomePage = () => {
   const manualLocationId = useFuelStationsStore((state) => state.manualLocationId);
   const searchQuery = useFuelStationsStore((state) => state.searchQuery);
   const geocodingResults = useFuelStationsStore((state) => state.geocodingResults);
+  const routeDestination = useFuelStationsStore((state) => state.routeDestination);
+  const isSearchingRoute = useFuelStationsStore((state) => state.isSearchingRoute);
+  const routeResults = useFuelStationsStore((state) => state.routeResults);
   const requestUserLocation = useFuelStationsStore((state) => state.requestUserLocation);
   const refreshPosition = useFuelStationsStore((state) => state.refreshPosition);
   const useDemoLocation = useFuelStationsStore((state) => state.useDemoLocation);
   const selectManualLocation = useFuelStationsStore((state) => state.selectManualLocation);
   const searchLocations = useFuelStationsStore((state) => state.searchLocations);
   const selectSearchLocation = useFuelStationsStore((state) => state.selectSearchLocation);
+  const searchRoute = useFuelStationsStore((state) => state.searchRoute);
+  const selectRouteLocation = useFuelStationsStore((state) => state.selectRouteLocation);
+  const clearRoute = useFuelStationsStore((state) => state.clearRoute);
   const setSelectedFuel = useFuelStationsStore((state) => state.setSelectedFuel);
   const setRadiusKm = useFuelStationsStore((state) => state.setRadiusKm);
   const setOpenOnly = useFuelStationsStore((state) => state.setOpenOnly);
@@ -78,15 +85,7 @@ export const HomePage = () => {
       ? `Jusqu'a ${stats.maxSavings.toFixed(2).replace(".", ",")} EUR d'economie par litre sur ${selectedFuel}.`
       : "Affinez vos filtres pour faire ressortir l'offre la plus interessante autour de vous.";
 
-  const geolocationHint =
-    locationSource === "browser" && userPosition
-      ? "La geolocalisation navigateur peut etre approximative. Si la carte semble decalee, recherchez votre ville manuellement."
-      : null;
 
-  const sourceHint =
-    userPosition && !isDataUnavailable
-      ? "Donnees live DGCCRF via prix-carburants.gouv.fr. Les enseignes peuvent etre estimees ou enrichies ponctuellement via OpenStreetMap."
-      : null;
 
   const distanceFocusHint =
     bestStation && absoluteCheapestStation && bestStation.id !== absoluteCheapestStation.id
@@ -99,9 +98,9 @@ export const HomePage = () => {
         <Card className="glass-panel overflow-hidden">
           <CardContent className="grid gap-6 p-5 md:grid-cols-[minmax(0,1fr)_18rem] md:p-8">
             <SectionHeading
-              eyebrow="Prototype mobile-first"
-              subtitle="Comparez instantanement les prix SP95, SP98, Diesel, E85 et GPL autour de votre position. L'interface met en avant le meilleur prix, la carte interactive, les favorites et l'economie locale potentielle."
-              title="Le comparateur carburants qui va droit au point"
+              eyebrow="FuelFlash Premium"
+              subtitle="Optimisez votre budget carburant avec une interface haute fidelite. Comparez les prix en temps reel sur votre itineraire."
+              title="Le comparateur intelligent qui va droit au point"
             />
             <div className="rounded-[28px] bg-slate-950 px-5 py-4 text-white">
               <div className="space-y-4">
@@ -129,6 +128,7 @@ export const HomePage = () => {
           geocodingError={geocodingError}
           isGeolocating={isGeolocating}
           isSearchingLocation={isSearchingLocation}
+          isSearchingRoute={isSearchingRoute}
           locationLabel={locationLabel}
           locationSource={locationSource}
           manualLocationId={manualLocationId}
@@ -139,14 +139,17 @@ export const HomePage = () => {
           onSearchAddress={(query) => void searchLocations(query)}
           onSelectManual={selectManualLocation}
           onSelectSearchResult={selectSearchLocation}
+          onSearchRoute={(query) => void searchRoute(query)}
+          onSelectRouteResult={(result) => void selectRouteLocation(result)}
+          onClearRoute={clearRoute}
           searchQuery={searchQuery}
           searchResults={geocodingResults}
+          routeDestination={routeDestination}
+          routeResults={routeResults}
           userPosition={userPosition}
         />
       </section>
 
-      {geolocationHint ? <Alert className="mb-4" variant="info">{geolocationHint}</Alert> : null}
-      {sourceHint ? <Alert className="mb-4" variant="info">{sourceHint}</Alert> : null}
       {genericError ? <Alert className="mb-4" variant="error">{genericError}</Alert> : null}
       {favoriteStations.length > 0 ? (
         <Alert className="mb-4" variant="success">
@@ -191,6 +194,7 @@ export const HomePage = () => {
                 comparableCount={stats.comparableCount}
                 maxSavings={stats.maxSavings}
                 stationCount={stats.stationCount}
+                maxNetSavings={stats.maxSavings} // Temporary fallback if maxNetSavings is same as maxSavings
               />
             </section>
           ) : null}
@@ -291,6 +295,62 @@ export const HomePage = () => {
               />
             </section>
           ) : null}
+
+          {/* Discovery Cards Section */}
+          <section className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800">
+            <div className="mb-6">
+              <SectionHeading
+                eyebrow="Analyses & Europe"
+                subtitle="Explorez les tendances nationales et comparez les prix avec nos voisins europeens."
+                title="Plus de perspectives"
+              />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Link to="/trends" className="group">
+                <Card className="glass-panel h-full transition-all duration-300 hover:shadow-xl hover:shadow-teal-500/10 hover:-translate-y-1 overflow-hidden">
+                  <CardContent className="p-0 flex flex-col h-full">
+                    <div className="p-6 flex-1 space-y-4">
+                      <div className="h-12 w-12 rounded-2xl bg-teal-500/10 flex items-center justify-center text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform duration-300">
+                        <BarChart3 className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-display font-bold text-slate-900 dark:text-white mb-2">Tendances locales</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Visualisez l'evolution des prix sur 7 jours, comparez Diesel vs Essence et découvrez le palmares des enseignes dans votre zone.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">Voir les graphiques</span>
+                      <ChevronRight className="h-4 w-4 text-teal-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/europe" className="group">
+                <Card className="glass-panel h-full transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
+                  <CardContent className="p-0 flex flex-col h-full">
+                    <div className="p-6 flex-1 space-y-4">
+                      <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300">
+                        <Globe className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-display font-bold text-slate-900 dark:text-white mb-2">Panorama Europe</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Comparez les prix entre la France, la Belgique, l'Allemagne, l'Espagne et l'Italie. Ideal pour preparer vos deplacements.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Explorer le marche</span>
+                      <ChevronRight className="h-4 w-4 text-blue-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          </section>
         </>
       )}
     </div>

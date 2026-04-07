@@ -1,107 +1,56 @@
-# FuelFlash
+# ⛽ FuelFlash - Comparateur de Carburants Premium (React Sync)
 
-Prototype mobile-first de comparaison de prix des carburants migre vers React + Vite + TypeScript + Tailwind + Zustand + React Router + react-leaflet.
+Une application web modernisee et performante pour trouver les stations-service les moins cheres en France. Cette branche **`React-Tawlind`** a ete synchronisee avec toutes les fonctionnalites avancees de la branche principale Vue 3, tout en adoptant un design **Slate-Emerald** de haute fidelite.
 
-## Stack
+![Showcase](https://raw.githubusercontent.com/lucide-react/lucide/main/icons/fuel.svg)
 
-- React 19
-- Vite
-- TypeScript
-- Tailwind CSS
-- composants UI style shadcn
-- Zustand
-- React Router
-- react-leaflet + leaflet.markercluster
-- Chart.js + react-chartjs-2
-- Vitest
-- Playwright
+## ✨ Fonctionnalités Unifiées
 
-## Fonctionnalites
+- 🚀 **Itinéraire Intelligent** : Recherchez une destination et découvrez les stations les moins chères sur votre trajet.
+- 💎 **Design Slate-Emerald** : Interface modernisée avec glassmorphisme, micro-animations et mode sombre natif.
+- ⛽ **Optimisation "Plein Malin"** : Algorithme exclusif calculant le gain net réel (Économie à la pompe - Coût du trajet/détour).
+- 🕒 **Séparation SP95 / E10** : Distinction stricte entre les carburants SP95 et SP95-E10 pour une comparaison précise.
+- 🌓 **Mode Sombre Automatique** : Design optimisé pour une utilisation nocturne ou en voiture.
+- 📍 **Géolocalisation Live** : Utilisation de l'API de géolocalisation du navigateur ou recherche manuelle par ville.
+- ⭐ **Favoris** : Enregistrez vos stations habituelles pour les retrouver instantanément.
+- 📊 **Historique & Tendances** : Visualisez l'évolution des prix sur les 30 derniers jours avec indicateurs de tendance.
 
-- geolocalisation navigateur avec gestion du refus et erreurs
-- fallback manuel via positions simulees et recherche libre par ville/adresse
-- donnees live DGCCRF via `prix-carburants.gouv.fr`
-- historique de prix enrichi via le dataset quotidien officiel
-- comparateur par carburant `SP95`, `SP98`, `Diesel`, `E85`, `GPL`
-- tri par prix, distance, economies, favoris
-- deduplication de stations tres proches
-- carte interactive avec clustering, rayon reel, fiche mobile, temps de trajet estime et navigation GPS
-- favoris persistants
-- dark mode
-- tests unitaires Vitest et test UI Playwright
+## 🛠️ Stack Technique
 
-## Installation
+- **Frontend** : React 19, Tailwind CSS, Lucide React.
+- **État** : Zustand (avec persistance locale).
+- **Cartographie** : Leaflet & OpenStreetMap.
+- **Proxy Server** : Node.js (Express) pour contourner les restrictions CORS des API gouvernementales.
 
+## 🚀 Installation & Lancement
+
+### 1. Cloner le dépôt
+```bash
+git clone https://github.com/votre-repo/fuel-price-comparator.git
+cd fuel-price-comparator
+git checkout React-Tawlind
+```
+
+### 2. Installer les dépendances
 ```bash
 npm install
-npm run dev
 ```
 
-Application locale par defaut : `http://localhost:3000`
-
-## Scripts
-
+### 3. Lancer le serveur Proxy (Indispensable pour les données réelles)
 ```bash
-npm run dev
-npm run build
-npm run preview
-npm run test:unit
-npm run test:e2e
-npm test
+node server/proxy-server.mjs
 ```
+Le serveur proxy écoute sur le port `8787`.
 
-## Arborescence
-
-```text
-src/
-  app/
-  components/
-    common/
-    filters/
-    layout/
-    map/
-    station/
-    ui/
-  data/
-  hooks/
-  lib/
-  routes/
-  services/
-  store/
-  styles/
-  test/
-  types/
-  utils/
-tests/
-  e2e/
+### 4. Lancer l'application React
+```bash
+npm run dev -- --port 3005
 ```
+Accédez à l'application via `http://localhost:3005`.
 
-## Architecture
+## 📈 Guide des Données
 
-- [src/services/apiClient.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/apiClient.ts) : client HTTP commun et erreurs API centralisees
-- [src/services/fuelApi.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/fuelApi.ts) : appels aux datasets officiels carburants
-- [src/services/geocodingService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/geocodingService.ts) : geocodage libre via Nominatim
-- [src/services/osmService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/osmService.ts) : enrichissement ponctuel d'enseigne via OpenStreetMap
-- [src/services/stationService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/stationService.ts) : mapping, normalisation, deduplication, tri, historique
-- [src/store/useFuelStationsStore.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/store/useFuelStationsStore.ts) : etat global Zustand, persistance, filtres, favoris, position
-- [src/hooks/useGeolocation.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/hooks/useGeolocation.ts) : acces geolocalisation navigateur
-- [src/hooks/useFuelStationsViewModel.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/hooks/useFuelStationsViewModel.ts) : derivees UI a partir du store
-- [src/components/map/StationsMap.tsx](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/components/map/StationsMap.tsx) : carte react-leaflet + clustering
-- [src/routes/HomePage.tsx](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/routes/HomePage.tsx) : page principale
-- [src/routes/StationDetailPage.tsx](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/routes/StationDetailPage.tsx) : page detail station
+Les prix sont rafraîchis toutes les 10 minutes via les API officielles du gouvernement français (`prix-carburants.gouv.fr`). Les noms des enseignes et services sont enrichis dynamiquement via **OpenStreetMap (OSM)** pour offrir une expérience plus riche que les données brutes officielles.
 
-## Notes de migration
-
-- les composables Vue ont ete remplaces par des hooks React
-- Pinia a ete remplace par Zustand
-- Vue Router a ete remplace par React Router
-- Vuetify a ete remplace par une couche Tailwind avec composants UI style shadcn
-- la logique metier, les datasets mock, les services API, les utilitaires geo et les tests metier ont ete conserves
-
-## Remplacer plus tard par une vraie API
-
-1. conserver [src/types/station.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/types/station.ts) comme contrat unique entre API, store et UI
-2. remplacer les endpoints dans [src/services/fuelApi.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/fuelApi.ts) par votre backend
-3. garder [src/services/apiClient.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/apiClient.ts) pour la gestion d'erreurs commune
-4. conserver [src/services/stationService.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/services/stationService.ts) comme couche de mapping metier
-5. faire evoluer [src/store/useFuelStationsStore.ts](/c:/Users/mikae/Mika2026/fuel-price-comparator/src/store/useFuelStationsStore.ts) sans changer les composants tant que le format `FuelStation` reste stable
+---
+*FuelFlash Premium - React Sync Edition*

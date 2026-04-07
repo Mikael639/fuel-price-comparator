@@ -1,4 +1,4 @@
-export const FUEL_TYPES = ["SP95", "SP98", "Diesel", "E85", "GPL"] as const;
+export const FUEL_TYPES = ["SP95", "SP95-E10", "SP98", "Diesel", "E85", "GPL"] as const;
 export const SERVICE_TYPES = [
   "Superette",
   "Lavage",
@@ -7,7 +7,7 @@ export const SERVICE_TYPES = [
   "Borne de recharge",
   "Station 24h/24",
 ] as const;
-export const SORT_MODES = ["price", "distance", "savings", "favorites"] as const;
+export const SORT_MODES = ["price", "distance", "savings", "smartFill", "favorites"] as const;
 
 export type FuelType = (typeof FUEL_TYPES)[number];
 export type ServiceType = (typeof SERVICE_TYPES)[number];
@@ -51,7 +51,10 @@ export interface FuelStation {
   fuels: FuelType[];
   fuelPrices: FuelPrices;
   priceHistory: PriceHistory;
+  priceUpdatedAt: Partial<Record<FuelType, string>>;
+  lastUpdatedAt: string | null;
   services: ServiceType[];
+  dataOrigin?: "official" | "mock";
 }
 
 export interface MockLocation {
@@ -77,6 +80,11 @@ export interface StationWithMetrics extends FuelStation {
   estimatedDriveMinutes: number;
   savingsPerLiter: number | null;
   isFavorite: boolean;
+  fillVolumeLiters: number;
+  estimatedDetourCost: number | null;
+  netSavingsForTank: number | null;
+  priceTrend: PriceTrend;
+  isRouteDetour: boolean;
 }
 
 export interface StationFilters {
@@ -91,6 +99,9 @@ export interface StationFilters {
 export interface StationSearchParams extends StationFilters {
   position: Coordinates;
   stations: FuelStation[];
+  fillVolumeLiters: number;
+  consumptionLitersPer100Km: number;
+  routePosition?: Coordinates | null;
 }
 
 export interface StationStats {
@@ -98,4 +109,10 @@ export interface StationStats {
   comparableCount: number;
   averagePrice: number | null;
   maxSavings: number | null;
+  maxNetSavings: number | null;
+}
+
+export interface RouteResult {
+  destination: string;
+  position: Coordinates;
 }

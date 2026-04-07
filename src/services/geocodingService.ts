@@ -16,7 +16,7 @@ interface NominatimResult {
   name?: string;
 }
 
-const GEOCODING_URL = "https://nominatim.openstreetmap.org/search";
+const GEOCODING_URL = "/api/geocode/search";
 
 const buildGeocodingUrl = (query: string) => {
   const params = new URLSearchParams({

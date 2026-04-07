@@ -22,6 +22,13 @@ export interface ApiStationRecord {
   e10_prix?: number | null;
   carburants_disponibles?: string[] | null;
   carburants_indisponibles?: string[] | null;
+  prix_maj?: string | null;
+  gazole_maj?: string | null;
+  sp95_maj?: string | null;
+  sp98_maj?: string | null;
+  e10_maj?: string | null;
+  e85_maj?: string | null;
+  gplc_maj?: string | null;
 }
 
 interface ApiRecordsResponse {
@@ -39,13 +46,11 @@ interface DailyHistoryResponse {
   results?: DailyHistoryRecord[];
 }
 
-const API_BASE_URL =
-  "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
-const DAILY_API_BASE_URL =
-  "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-carburants-quotidien/records";
+const API_BASE_URL = "/api/fuel/records";
+const DAILY_API_BASE_URL = "/api/fuel-history/records";
 
 const stationSelect =
-  "id,adresse,ville,cp,geom,services_service,horaires,horaires_jour,horaires_automate_24_24,sp95_prix,sp98_prix,gazole_prix,e85_prix,gplc_prix,e10_prix,carburants_disponibles,carburants_indisponibles";
+  "id,adresse,ville,cp,geom,services_service,horaires,horaires_jour,horaires_automate_24_24,sp95_prix,sp95_maj,sp98_prix,sp98_maj,gazole_prix,gazole_maj,e85_prix,e85_maj,gplc_prix,gplc_maj,e10_prix,e10_maj,carburants_disponibles,carburants_indisponibles,prix_maj";
 
 const buildNearbyUrl = (position: Coordinates, radiusKm: number) => {
   const params = new URLSearchParams({

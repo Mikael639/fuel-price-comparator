@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 160 25% 97%;
+    --background: 160 25% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -14,36 +14,36 @@
     --primary-foreground: 0 0% 100%;
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 160 18% 94%;
+    --muted: 160 18% 95%;
     --muted-foreground: 215 18% 40%;
     --accent: 43 100% 50%;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 160 20% 88%;
-    --input: 160 20% 88%;
+    --border: 160 20% 90%;
+    --input: 160 20% 90%;
     --ring: 174 77% 26%;
-    --radius: 1.2rem;
+    --radius: 1.25rem;
   }
 
   .dark {
-    --background: 198 56% 7%;
-    --foreground: 164 63% 94%;
-    --card: 198 48% 10%;
-    --card-foreground: 164 63% 94%;
-    --primary: 170 74% 64%;
-    --primary-foreground: 198 56% 7%;
-    --secondary: 164 63% 94%;
-    --secondary-foreground: 198 48% 10%;
-    --muted: 198 37% 14%;
-    --muted-foreground: 164 22% 76%;
-    --accent: 43 98% 70%;
-    --accent-foreground: 198 56% 7%;
-    --destructive: 0 86% 77%;
-    --destructive-foreground: 198 56% 7%;
-    --border: 200 26% 22%;
-    --input: 200 26% 22%;
-    --ring: 170 74% 64%;
+    --background: 222 47% 4%; /* Deep Slate 950 */
+    --foreground: 210 40% 98%;
+    --card: 222 47% 6%; /* Deep Slate 900 */
+    --card-foreground: 210 40% 98%;
+    --primary: 170 85% 65%; /* Bright Emerald */
+    --primary-foreground: 222 47% 4%;
+    --secondary: 215 25% 27%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 215 25% 12%;
+    --muted-foreground: 215 16% 70%;
+    --accent: 43 100% 60%;
+    --accent-foreground: 222 47% 4%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 222 47% 4%;
+    --border: 215 25% 15%;
+    --input: 215 25% 15%;
+    --ring: 170 85% 65%;
   }
 
   * {

@@ -26,6 +26,16 @@ export const formatMoney = (amount: number | null | undefined) =>
 
 export const formatDateLabel = (value: string) => dateFormatter.format(new Date(value));
 
+const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export const formatDateTime = (value: string | null | undefined) =>
+  value ? dateTimeFormatter.format(new Date(value)) : "Inconnue";
+
 export const formatDriveTime = (minutes: number) =>
   minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 
@@ -39,5 +49,22 @@ export const sortModeCopy: Record<SortMode, string> = {
   price: "Prix",
   distance: "Distance",
   savings: "Economies",
+  smartFill: "Plein malin",
   favorites: "Favoris d'abord",
+};
+
+export const formatFreshness = (date: string | null | undefined) => {
+  if (!date) return "Mise à jour inconnue";
+  const now = new Date();
+  const update = new Date(date);
+  if (isNaN(update.getTime())) return "Format date invalide";
+  const diffMs = now.getTime() - update.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMin / 60);
+
+  if (diffMin < 1) return "À l'instant";
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  if (diffHours < 24) return `Il y a ${diffHours} h`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `Il y a ${diffDays} jour${diffDays > 1 ? "s" : ""}`;
 };

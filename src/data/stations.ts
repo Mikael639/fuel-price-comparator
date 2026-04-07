@@ -25,7 +25,7 @@ const createHistorySeries = (values: number[]) =>
 const services = (...items: ServiceType[]) => items;
 
 const createStation = (
-  station: Omit<FuelStation, "fuels" | "priceHistory" | "brandSource"> & {
+  station: Omit<FuelStation, "fuels" | "priceHistory" | "brandSource" | "priceUpdatedAt" | "lastUpdatedAt"> & {
     fuelPrices: FuelPrices;
     history: Partial<Record<FuelType, number[]>>;
   },
@@ -37,6 +37,12 @@ const createStation = (
     },
     {},
   );
+
+  const now = new Date().toISOString();
+  const priceUpdatedAt = Object.keys(station.fuelPrices).reduce((acc, fuel) => {
+    acc[fuel as FuelType] = now;
+    return acc;
+  }, {} as Partial<Record<FuelType, string>>);
 
   return {
     id: station.id,
@@ -53,6 +59,8 @@ const createStation = (
     fuels: Object.keys(station.fuelPrices) as FuelType[],
     priceHistory,
     services: station.services,
+    lastUpdatedAt: now,
+    priceUpdatedAt,
   };
 };
 

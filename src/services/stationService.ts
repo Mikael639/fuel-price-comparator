@@ -38,17 +38,27 @@ interface ParsedOpeningHours {
 
 const FUEL_TO_API_FIELD: Record<FuelType, keyof ApiStationRecord> = {
   SP95: "sp95_prix",
+  "SP95-E10": "e10_prix",
   SP98: "sp98_prix",
   Diesel: "gazole_prix",
   E85: "e85_prix",
   GPL: "gplc_prix",
 };
 
+const FUEL_TO_API_MAJ_FIELD: Record<FuelType, keyof ApiStationRecord> = {
+  SP95: "sp95_maj",
+  "SP95-E10": "e10_maj",
+  SP98: "sp98_maj",
+  Diesel: "gazole_maj",
+  E85: "e85_maj",
+  GPL: "gplc_maj",
+};
+
 const DAILY_NAME_TO_FUEL: Record<string, FuelType> = {
   Gazole: "Diesel",
   SP95: "SP95",
+  "E10": "SP95-E10",
   SP98: "SP98",
-  E10: "SP95",
   E85: "E85",
   GPLc: "GPL",
 };
@@ -330,7 +340,7 @@ const buildFuelPrices = (record: ApiStationRecord): FuelPrices => {
 
   (Object.keys(FUEL_TO_API_FIELD) as FuelType[]).forEach((fuel) => {
     const field = FUEL_TO_API_FIELD[fuel];
-    const value = fuel === "SP95" ? (record.sp95_prix ?? record.e10_prix) : record[field];
+    const value = record[field];
 
     if (typeof value === "number") {
       prices[fuel] = value;
@@ -389,7 +399,15 @@ export const mapRecordToStation = (record: ApiStationRecord): FuelStation | null
     fuels,
     fuelPrices,
     priceHistory: buildPriceHistory(id, fuelPrices),
+    priceUpdatedAt: fuels.reduce((acc, fuel) => {
+      const field = FUEL_TO_API_MAJ_FIELD[fuel];
+      const maj = record[field];
+      if (typeof maj === "string") acc[fuel] = maj;
+      return acc;
+    }, {} as Partial<Record<FuelType, string>>),
+    lastUpdatedAt: record.prix_maj?.split(",").sort().pop() || null,
     services: [...new Set(normalizedServices)],
+    dataOrigin: "official",
   };
 };
 
@@ -470,17 +488,31 @@ const buildMetrics = (
   fuel: FuelType,
   averagePrice: number | null,
   favoriteIds: string[],
+  fillVolumeLiters: number = 50,
+  consumptionLitersPer100Km: number = 7,
+  routePosition?: Coordinates | null,
 ): StationWithMetrics => {
   const distanceKm = haversineDistance(position, { lat: station.lat, lng: station.lng });
   const selectedFuelPrice = station.fuelPrices[fuel] ?? null;
+  const driveMinutes = estimateDriveTimeMinutes(distanceKm);
+  const savingsPerLiter = (selectedFuelPrice != null && averagePrice != null) ? Math.max(averagePrice - selectedFuelPrice, 0) : null;
+  
+  const fillSavings = (selectedFuelPrice != null && averagePrice != null) ? (averagePrice - selectedFuelPrice) * fillVolumeLiters : 0;
+  const detourCostValue = selectedFuelPrice != null ? (distanceKm * 2 * (consumptionLitersPer100Km / 100)) * selectedFuelPrice : 0;
+  const netSavingsForTank = fillSavings - detourCostValue;
 
   return {
     ...station,
     distanceKm,
     selectedFuelPrice,
-    estimatedDriveMinutes: estimateDriveTimeMinutes(distanceKm),
-    savingsPerLiter: selectedFuelPrice != null && averagePrice != null ? Math.max(averagePrice - selectedFuelPrice, 0) : null,
+    estimatedDriveMinutes: driveMinutes,
+    savingsPerLiter: savingsPerLiter && savingsPerLiter > 0 ? savingsPerLiter : null,
     isFavorite: favoriteIds.includes(station.id),
+    fillVolumeLiters,
+    estimatedDetourCost: detourCostValue,
+    netSavingsForTank: netSavingsForTank > 0 ? netSavingsForTank : null,
+    priceTrend: stationService.getTrend(station, fuel),
+    isRouteDetour: Boolean(routePosition),
   };
 };
 
@@ -494,6 +526,12 @@ export const sortStations = (stations: StationWithMetrics[], sortMode: SortMode)
 
     if (sortMode === "distance") {
       return left.distanceKm - right.distanceKm;
+    }
+
+    if (sortMode === "smartFill") {
+        const leftNet = (left.savingsPerLiter ?? 0) * left.fillVolumeLiters - (left.estimatedDetourCost ?? 0);
+        const rightNet = (right.savingsPerLiter ?? 0) * right.fillVolumeLiters - (right.estimatedDetourCost ?? 0);
+        return rightNet - leftNet || left.distanceKm - right.distanceKm;
     }
 
     if (sortMode === "savings") {
@@ -583,6 +621,9 @@ class StationService {
     fuel,
     sortMode,
     favoriteIds,
+    fillVolumeLiters,
+    consumptionLitersPer100Km,
+    routePosition,
   }: StationSearchParams): StationWithMetrics[] {
     const scopedStations = stations
       .map((station) => ({
@@ -591,7 +632,9 @@ class StationService {
       }))
       .filter((station) => station.distanceKm <= radiusKm)
       .filter(({ station }) => !openOnly || station.isOpen)
-      .filter(({ station }) => (services.length === 0 ? true : services.every((service) => station.services.includes(service))))
+      .filter(({ station }) =>
+        services.length === 0 ? true : services.every((service) => station.services.includes(service)),
+      )
       .map(({ station }) => station);
 
     const comparablePrices = scopedStations
@@ -604,7 +647,18 @@ class StationService {
         : null;
 
     return sortStations(
-      scopedStations.map((station) => buildMetrics(station, position, fuel, averagePrice, favoriteIds)),
+      scopedStations.map((station) => 
+        buildMetrics(
+          station, 
+          position, 
+          fuel, 
+          averagePrice, 
+          favoriteIds, 
+          fillVolumeLiters, 
+          consumptionLitersPer100Km,
+          routePosition
+        )
+      ),
       sortMode,
     );
   }
@@ -647,16 +701,37 @@ class StationService {
     return Math.max(averagePrice - station.selectedFuelPrice, 0);
   }
 
+  getStationFillSavings(station: StationWithMetrics, averagePrice: number | null, volume: number = 50) {
+    const savingsPerLiter = this.getStationSavings(station, averagePrice);
+    return savingsPerLiter != null ? savingsPerLiter * volume : null;
+  }
+
+  getStationNetSavingsForFill(
+    station: StationWithMetrics,
+    averagePrice: number | null,
+    volume: number,
+    consumption: number,
+  ) {
+    const fillSavings = this.getStationFillSavings(station, averagePrice, volume);
+    if (fillSavings == null) {
+      return null;
+    }
+
+    const detourCost = (station.distanceKm * 2 * (consumption / 100)) * (station.selectedFuelPrice ?? 1.8);
+    return fillSavings - detourCost;
+  }
+
   getStats(stations: StationWithMetrics[]): StationStats {
     const comparableStations = this.getComparableStations(stations);
     const averagePrice = this.getAveragePrice(stations);
-    const bestStation = this.getAbsoluteCheapestStation(stations);
+    const cheapestStation = this.getAbsoluteCheapestStation(stations);
 
     return {
       stationCount: stations.length,
       comparableCount: comparableStations.length,
       averagePrice,
-      maxSavings: bestStation && averagePrice != null ? Math.max(averagePrice - bestStation.selectedFuelPrice, 0) : null,
+      maxSavings: cheapestStation && averagePrice != null ? Math.max(averagePrice - cheapestStation.selectedFuelPrice, 0) : null,
+      maxNetSavings: null,
     };
   }
 
@@ -686,6 +761,142 @@ class StationService {
       left.localeCompare(right),
     ) as ServiceType[];
   }
+
+  getAreaWeeklyFuelTrend(
+    stations: StationWithMetrics[],
+    fuel: FuelType,
+    options?: { fallbackPosition?: Coordinates | null; fallbackRadiusKm?: number },
+  ): { labels: string[]; prices: number[]; latestPrice: number | null; seriesCount: number; source: "official" | "mock" } {
+    // Collect history points from all stations for the selected fuel
+    const allPoints: { date: string; price: number }[] = [];
+    let source: "official" | "mock" = "official";
+
+    for (const station of stations) {
+      const history = station.priceHistory?.[fuel];
+      if (history && history.length > 0) {
+        for (const point of history) {
+          allPoints.push({ date: point.date, price: point.price });
+        }
+      }
+    }
+
+    if (allPoints.length === 0) {
+      // Fallback: use stale prices from stations
+      source = "mock";
+      const stationsWithPrice = stations.filter(s => s.selectedFuelPrice != null);
+      if (stationsWithPrice.length === 0) {
+        return { labels: [], prices: [], latestPrice: null, seriesCount: 0, source };
+      }
+      const avg = stationsWithPrice.reduce((sum, s) => sum + (s.selectedFuelPrice ?? 0), 0) / stationsWithPrice.length;
+      const today = new Date();
+      const labels: string[] = [];
+      const prices: number[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        labels.push(d.toISOString().slice(0, 10));
+        prices.push(+(avg + (Math.random() - 0.5) * 0.02).toFixed(3));
+      }
+      return { labels, prices, latestPrice: prices[prices.length - 1] ?? null, seriesCount: stationsWithPrice.length, source };
+    }
+
+    // Group by date and compute daily average
+    const byDate = new Map<string, number[]>();
+    for (const pt of allPoints) {
+      const day = pt.date.slice(0, 10);
+      if (!byDate.has(day)) byDate.set(day, []);
+      byDate.get(day)!.push(pt.price);
+    }
+
+    const sorted = [...byDate.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-7);
+
+    const labels = sorted.map(([d]) => d);
+    const prices = sorted.map(([, pts]) => +(pts.reduce((s, p) => s + p, 0) / pts.length).toFixed(3));
+    const latestPrice = prices[prices.length - 1] ?? null;
+
+    return { labels, prices, latestPrice, seriesCount: stations.length, source };
+  }
+
+  getPriceTrendFromSeries(prices: number[]): PriceTrend {
+    if (prices.length < 2) return "stable";
+    const first = prices[0] ?? 0;
+    const last = prices[prices.length - 1] ?? first;
+    const delta = last - first;
+    if (delta > 0.005) return "up";
+    if (delta < -0.005) return "down";
+    return "stable";
+  }
+
+  getDieselEssenceComparator(stations: StationWithMetrics[]): {
+    dieselAverage: number | null;
+    gasolineAverage: number | null;
+    cheaperFuel: "Diesel" | "SP95" | null;
+  } {
+    const dieselStations = stations.filter(s => s.fuelPrices.Diesel != null);
+    const gasolineStations = stations.filter(s => s.fuelPrices.SP95 != null);
+
+    const dieselAverage = dieselStations.length > 0
+      ? dieselStations.reduce((sum, s) => sum + (s.fuelPrices.Diesel ?? 0), 0) / dieselStations.length
+      : null;
+
+    const gasolineAverage = gasolineStations.length > 0
+      ? gasolineStations.reduce((sum, s) => sum + (s.fuelPrices.SP95 ?? 0), 0) / gasolineStations.length
+      : null;
+
+    let cheaperFuel: "Diesel" | "SP95" | null = null;
+    if (dieselAverage != null && gasolineAverage != null) {
+      cheaperFuel = dieselAverage <= gasolineAverage ? "Diesel" : "SP95";
+    } else if (dieselAverage != null) {
+      cheaperFuel = "Diesel";
+    } else if (gasolineAverage != null) {
+      cheaperFuel = "SP95";
+    }
+
+    return { dieselAverage, gasolineAverage, cheaperFuel };
+  }
+
+  getAreaFuelComparison(stations: StationWithMetrics[]): { fuel: FuelType; averagePrice: number | null }[] {
+    const fuels: FuelType[] = ["SP95", "SP98", "Diesel", "E85", "GPL"];
+    return fuels.map(fuel => {
+      const stationsWithFuel = stations.filter(s => s.fuelPrices[fuel] != null);
+      const averagePrice = stationsWithFuel.length > 0
+        ? stationsWithFuel.reduce((sum, s) => sum + (s.fuelPrices[fuel] ?? 0), 0) / stationsWithFuel.length
+        : null;
+      return { fuel, averagePrice };
+    }).filter(entry => entry.averagePrice != null);
+  }
+
+  getAreaBrandComparison(stations: StationWithMetrics[], fuel: FuelType): { brand: string; averagePrice: number }[] {
+    const brandMap = new Map<string, number[]>();
+    for (const station of stations) {
+      const price = station.fuelPrices[fuel];
+      if (price == null || !station.brand) continue;
+      if (!brandMap.has(station.brand)) brandMap.set(station.brand, []);
+      brandMap.get(station.brand)!.push(price);
+    }
+
+    return [...brandMap.entries()]
+      .map(([brand, prices]) => ({
+        brand,
+        averagePrice: prices.reduce((s, p) => s + p, 0) / prices.length,
+      }))
+      .sort((a, b) => a.averagePrice - b.averagePrice)
+      .slice(0, 8);
+  }
+
+  getEuropeDieselEssenceComparator(market: { snapshots: { prices: Partial<Record<FuelType, number>> }[] }): {
+    dieselAverage: number | null;
+    gasolineAverage: number | null;
+  } {
+    const lastSnapshot = market.snapshots.at(-1);
+    return {
+      dieselAverage: lastSnapshot?.prices["Diesel"] ?? null,
+      gasolineAverage: lastSnapshot?.prices["SP95"] ?? null,
+    };
+  }
 }
 
 export const stationService = new StationService();
+

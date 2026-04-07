@@ -1,21 +1,25 @@
-import { fileURLToPath, URL } from "node:url";
-import react from "@vitejs/plugin-react";
+﻿import { fileURLToPath, URL } from "node:url";
+import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
-import { defineConfig } from "vitest/config";
+import vuetify from "vite-plugin-vuetify";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [
-    react(),
+    vue(),
+    vuetify({
+      autoImport: true,
+    }),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
+      includeAssets: ["favicon.svg"],
       manifest: {
-        name: "FuelFlash - Comparateur Premium",
+        name: "FuelFlash - Comparateur",
         short_name: "FuelFlash",
-        description: "Le comparateur intelligent de prix des carburants en France",
+        description: "Comparateur de prix des carburants en France",
         theme_color: "#0F766E",
-        background_color: "#0F172A",
+        background_color: "#ffffff",
         display: "standalone",
         start_url: "/",
         lang: "fr",
@@ -52,9 +56,9 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/fuel/") ||
-              url.pathname.startsWith("/api/geocode/") ||
-              url.pathname.startsWith("/api/europe/") ||
+              url.pathname.startsWith("/fuel/") ||
+              url.pathname.startsWith("/geocode/") ||
+              url.pathname.startsWith("/europe/") ||
               url.hostname === "data.economie.gouv.fr" ||
               url.hostname === "nominatim.openstreetmap.org" ||
               url.hostname === "overpass-api.de",
@@ -97,23 +101,6 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    proxy: {
-      "/api/fuel": {
-        target: "https://data.economie.gouv.fr",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/fuel/, "/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2"),
-      },
-      "/api/fuel-history": {
-        target: "https://data.economie.gouv.fr",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/fuel-history/, "/api/explore/v2.1/catalog/datasets/prix-carburants-quotidien"),
-      },
-      "/api/geocode": {
-        target: "https://nominatim.openstreetmap.org",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/geocode/, ""),
-      },
-    },
   },
   test: {
     environment: "jsdom",

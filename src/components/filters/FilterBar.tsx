@@ -37,75 +37,96 @@ export const FilterBar = ({
   onSortModeChange,
 }: FilterBarProps) => {
   return (
-    <Card>
-      <CardContent className="space-y-5 p-5">
-        <div className="space-y-3">
-          <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-primary">Filtres</p>
+    <Card className="glass-panel border-emerald-500/10">
+      <CardContent className="space-y-6 p-5 md:p-6">
+        <div className="space-y-4">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80">Choix du carburant</p>
           <div className="flex flex-wrap gap-2">
             {fuelOptions.map((fuel) => (
               <button
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                  "relative overflow-hidden rounded-xl border px-5 py-2.5 text-sm font-bold transition-all duration-300",
                   selectedFuel === fuel
-                    ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                    : "border-border bg-card hover:bg-muted",
+                    ? "border-primary bg-primary text-white shadow-lg shadow-primary/20 scale-105"
+                    : "border-border bg-card/50 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
                 )}
                 key={fuel}
                 onClick={() => onSelectedFuelChange(fuel)}
                 type="button"
               >
                 {fuel}
+                {selectedFuel === fuel && (
+                   <span className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
+                )}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span>Rayon de recherche</span>
-              <strong>{radiusKm} km</strong>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px_auto] lg:items-center">
+          <div className="space-y-4 rounded-2xl bg-slate-100 dark:bg-slate-900/50 p-4">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <span>Périmètre de recherche</span>
+              <span className="text-primary">{radiusKm} km</span>
             </div>
-            <Slider max={25} min={2} onValueChange={([value]) => onRadiusKmChange(value)} step={1} value={[radiusKm]} />
+            <Slider 
+              max={50} 
+              min={2} 
+              onValueChange={([value]) => onRadiusKmChange(value)} 
+              step={1} 
+              value={[radiusKm]} 
+              className="py-2"
+            />
           </div>
 
-          <Select
-            onValueChange={onSortModeChange}
-            options={Object.entries(sortModeCopy).map(([value, label]) => ({
-              value: value as SortMode,
-              label,
-            }))}
-            value={sortMode}
-          />
+          <div className="space-y-2">
+             <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80 px-1">Mode de tri</p>
+             <Select
+               onValueChange={onSortModeChange}
+               options={Object.entries(sortModeCopy).map(([value, label]) => ({
+                 value: value as SortMode,
+                 label: value === "smartFill" ? `✨ ${label}` : label,
+               }))}
+               value={sortMode}
+               className="rounded-xl border-border bg-card/50 font-semibold"
+             />
+          </div>
 
-          <label className="flex items-center gap-3 rounded-full border border-border bg-card px-4 py-3 text-sm font-medium">
+          <label className="flex h-full items-center gap-4 rounded-xl border border-border bg-card/50 px-5 py-4 text-sm font-bold transition-all hover:bg-muted/50 cursor-pointer group">
             <Switch checked={openOnly} onCheckedChange={onOpenOnlyChange} />
-            Stations ouvertes uniquement
+            <span className="group-hover:text-primary transition-colors">Ouvertes uniquement</span>
           </label>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-medium">Services souhaites</p>
-          <div className="flex flex-wrap gap-2">
-            {serviceOptions.map((service) => {
-              const active = selectedServices.includes(service);
-              return (
-                <button
-                  className="rounded-full"
-                  key={service}
-                  onClick={() =>
-                    onSelectedServicesChange(
-                      active ? selectedServices.filter((item) => item !== service) : [...selectedServices, service],
-                    )
-                  }
-                  type="button"
-                >
-                  <Badge variant={active ? "accent" : "outline"}>{service}</Badge>
-                </button>
-              );
-            })}
+        {serviceOptions.length > 0 && (
+          <div className="space-y-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80">Services additionnels</p>
+            <div className="flex flex-wrap gap-2">
+              {serviceOptions.map((service) => {
+                const active = selectedServices.includes(service);
+                return (
+                  <button
+                    className={cn(
+                      "rounded-lg border px-3 py-1.5 text-xs font-bold transition-all",
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card/30 text-muted-foreground hover:bg-muted/50"
+                    )}
+                    key={service}
+                    onClick={() =>
+                      onSelectedServicesChange(
+                        active ? selectedServices.filter((item) => item !== service) : [...selectedServices, service],
+                      )
+                    }
+                    type="button"
+                  >
+                    {service}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

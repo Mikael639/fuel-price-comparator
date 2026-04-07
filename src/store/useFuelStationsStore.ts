@@ -39,6 +39,13 @@ interface FuelStationsState {
   favoriteIds: string[];
   searchQuery: string;
   geocodingResults: GeocodingResult[];
+  routeDestination: string;
+  isSearchingRoute: boolean;
+  routePosition: Coordinates | null;
+  consumptionLitersPer100Km: number;
+  fillVolumeLiters: number;
+  routeResults: GeocodingResult[];
+  confirmedStationIds: string[];
   initialize: () => Promise<void>;
   loadStationsForArea: (position: Coordinates) => Promise<void>;
   requestUserLocation: () => Promise<void>;
@@ -55,6 +62,12 @@ interface FuelStationsState {
   setOpenOnly: (value: boolean) => void;
   setSelectedServices: (value: ServiceType[]) => void;
   setSortMode: (value: SortMode) => void;
+  searchRoute: (query: string) => Promise<void>;
+  selectRouteLocation: (result: GeocodingResult) => Promise<void>;
+  setConsumptionLitersPer100Km: (value: number) => void;
+  setFillVolumeLiters: (value: number) => void;
+  confirmStationPrice: (stationId: string) => void;
+  clearRoute: () => void;
 }
 
 interface PersistedState {
@@ -69,6 +82,8 @@ interface PersistedState {
   userPosition: PersistedLocation | null;
   locationSource: LocationSource;
   locationPlaceId: string | null;
+  consumptionLitersPer100Km: number;
+  fillVolumeLiters: number;
 }
 
 const persistLocation = (position: Coordinates | null, source: LocationSource, placeId: string | null): PersistedLocation | null =>
@@ -122,6 +137,13 @@ export const useFuelStationsStore = create<FuelStationsState>()(
       favoriteIds: [],
       searchQuery: "",
       geocodingResults: [],
+      routeDestination: "",
+      isSearchingRoute: false,
+      routePosition: null,
+      consumptionLitersPer100Km: 7,
+      fillVolumeLiters: 50,
+      routeResults: [],
+      confirmedStationIds: [],
       initialize: async () => {
         const { stations, userPosition } = get();
         if (stations.length === 0) {
@@ -135,13 +157,30 @@ export const useFuelStationsStore = create<FuelStationsState>()(
         set({ isLoading: true, genericError: null });
 
         try {
-          const stations = await stationService.getStationsAround(position, get().radiusKm);
+          // Load stations for current position
+          let stations = await stationService.getStationsAround(position, get().radiusKm);
+          
+          // If itinerary is active, also load stations for destination and merge
+          const { routePosition } = get();
+          if (routePosition && (routePosition.lat !== position.lat || routePosition.lng !== position.lng)) {
+              try {
+                  const destStations = await stationService.getStationsAround(routePosition, get().radiusKm);
+                  // Merge and deduplicate
+                  const existingIds = new Set(stations.map(s => s.id));
+                  const newStations = destStations.filter(s => !existingIds.has(s.id));
+                  stations = [...stations, ...newStations];
+              } catch (e) {
+                  console.error("Failed to load destination stations", e);
+              }
+          }
+
           set({
             stations,
             genericError:
               stations.length === 0 ? "Aucune station n'a ete retournee par l'API officielle dans cette zone." : null,
           });
 
+          // Background enrichment
           const candidates = stations
             .filter((station) => station.brandSource === "not_provided")
             .sort((left, right) => haversineDistance(position, left) - haversineDistance(position, right))
@@ -156,12 +195,14 @@ export const useFuelStationsStore = create<FuelStationsState>()(
             }
           }
         } catch (error) {
+          // API unavailable — use local fallback silently (no blocking error shown to user)
+          const fallbackStations = stationService.getMockStations();
+          console.info("[FuelFlash] API indisponible, utilisation du dataset local de secours.", error);
           set({
-            stations: stationService.getMockStations(),
-            genericError:
-              error instanceof Error
-                ? `${error.message} Affichage du dataset local de secours.`
-                : "L'API officielle des carburants est indisponible. Affichage du dataset local de secours.",
+            stations: fallbackStations,
+            genericError: fallbackStations.length === 0
+              ? "Impossible de charger les stations. Veuillez réessayer."
+              : null,
           });
         } finally {
           set({ isLoading: false });
@@ -310,7 +351,48 @@ export const useFuelStationsStore = create<FuelStationsState>()(
       },
       setOpenOnly: (value) => set({ openOnly: value }),
       setSelectedServices: (value) => set({ selectedServices: value }),
-      setSortMode: (value) => set({ sortMode: value }),
+      setSortMode: (value: SortMode) => set({ sortMode: value }),
+      searchRoute: async (query) => {
+        set({ routeDestination: query, geocodingError: null });
+        if (!query.trim()) {
+          set({ routeResults: [] });
+          return;
+        }
+
+        set({ isSearchingRoute: true });
+        try {
+          const routeResults = await geocodingService.search(query);
+          set({ routeResults });
+        } catch (error) {
+          set({
+            routeResults: [],
+            geocodingError: error instanceof Error ? error.message : "Le geocodage est indisponible.",
+          });
+        } finally {
+          set({ isSearchingRoute: false });
+        }
+      },
+      selectRouteLocation: async (result) => {
+        const coordinates = { lat: result.lat, lng: result.lng, label: result.label };
+        set({
+          routePosition: coordinates,
+          routeDestination: `${result.label} • ${result.city}`,
+          routeResults: [],
+        });
+        
+        // When a route is set, we might want to load stations at the destination too
+        if (coordinates) {
+            await get().loadStationsForArea(coordinates);
+        }
+      },
+      setConsumptionLitersPer100Km: (value) => set({ consumptionLitersPer100Km: value }),
+      setFillVolumeLiters: (value) => set({ fillVolumeLiters: value }),
+      confirmStationPrice: (stationId) => {
+        if (!get().confirmedStationIds.includes(stationId)) {
+          set((state) => ({ confirmedStationIds: [...state.confirmedStationIds, stationId] }));
+        }
+      },
+      clearRoute: () => set({ routePosition: null, routeDestination: "", routeResults: [] }),
     }),
     {
       name: "fuel-flash:preferences:v5",
@@ -327,6 +409,8 @@ export const useFuelStationsStore = create<FuelStationsState>()(
         userPosition: persistLocation(state.userPosition, state.locationSource, state.locationPlaceId),
         locationSource: state.locationSource,
         locationPlaceId: state.locationPlaceId,
+        consumptionLitersPer100Km: state.consumptionLitersPer100Km,
+        fillVolumeLiters: state.fillVolumeLiters,
       }),
       merge: (persistedState, currentState) => {
         const data = persistedState as { state?: PersistedState };
