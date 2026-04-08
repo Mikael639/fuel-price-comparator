@@ -1,6 +1,7 @@
 import http from "node:http";
 import { URL } from "node:url";
 import XLSX from "xlsx";
+import { handlePriceFeedbackRequest } from "./price-feedback.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
@@ -235,6 +236,11 @@ const server = http.createServer(async (request, response) => {
       const query = await readRequestBody(request);
       const payload = await proxyOsmBrandLookup(query);
       sendJson(response, 200, payload);
+      return;
+    }
+
+    if ((request.method === "GET" || request.method === "POST") && url.pathname === "/api/price-feedback") {
+      await handlePriceFeedbackRequest(request, response);
       return;
     }
 

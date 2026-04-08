@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { EmptyStateCard } from "@/components/common/EmptyStateCard";
 import { SectionHeading } from "@/components/common/SectionHeading";
 import { PriceHistoryChart } from "@/components/station/PriceHistoryChart";
+import { PriceFeedbackPanel } from "@/components/station/PriceFeedbackPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -192,6 +193,15 @@ export const StationDetailPage = () => {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="mb-6 md:mb-8">
+        <PriceFeedbackPanel
+          displayedPrice={station.fuelPrices[activeFuel] ?? null}
+          eagerSummary
+          fuel={activeFuel}
+          stationId={station.id}
+        />
       </section>
 
       <section className="mb-6 md:mb-8">

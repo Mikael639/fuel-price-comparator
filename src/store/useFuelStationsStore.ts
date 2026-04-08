@@ -47,7 +47,6 @@ interface FuelStationsState {
   fillVolumeLiters: number;
   favoriteAlertPrice: number | null;
   routeResults: GeocodingResult[];
-  confirmedStationIds: string[];
   initialize: () => Promise<void>;
   loadStationsForArea: (position: Coordinates, options?: { forceRefresh?: boolean }) => Promise<void>;
   requestUserLocation: (options?: { forceRefresh?: boolean }) => Promise<void>;
@@ -67,7 +66,6 @@ interface FuelStationsState {
   setConsumptionLitersPer100Km: (value: number) => void;
   setFillVolumeLiters: (value: number) => void;
   setFavoriteAlertPrice: (value: number | null) => void;
-  confirmStationPrice: (stationId: string) => void;
   clearRoute: () => void;
   setHasHydrated: (value: boolean) => void;
 }
@@ -146,7 +144,6 @@ export const useFuelStationsStore = create<FuelStationsState>()(
       fillVolumeLiters: appConfig.stations.defaultTankVolumeLiters,
       favoriteAlertPrice: appConfig.stations.defaultFavoriteAlertPrice,
       routeResults: [],
-      confirmedStationIds: [],
       initialize: async () => {
         const { stations, userPosition } = get();
         if (stations.length === 0) {
@@ -357,11 +354,6 @@ export const useFuelStationsStore = create<FuelStationsState>()(
       setConsumptionLitersPer100Km: (value) => set({ consumptionLitersPer100Km: value }),
       setFillVolumeLiters: (value) => set({ fillVolumeLiters: value }),
       setFavoriteAlertPrice: (value) => set({ favoriteAlertPrice: value }),
-      confirmStationPrice: (stationId) => {
-        if (!get().confirmedStationIds.includes(stationId)) {
-          set((state) => ({ confirmedStationIds: [...state.confirmedStationIds, stationId] }));
-        }
-      },
       clearRoute: () => {
         set({ routePosition: null, routeDestination: "", routeResults: [] });
         const { userPosition } = get();

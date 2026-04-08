@@ -75,6 +75,10 @@ export const appConfig = {
     timeoutMs: parseNumber(import.meta.env.VITE_EUROPE_TIMEOUT_MS, 12_000),
     cacheTtlMs: parseNumber(import.meta.env.VITE_EUROPE_CACHE_TTL_MS, 6 * 60 * 60 * 1000),
   },
+  feedback: {
+    endpoint: withProxy("/price-feedback", "/api/price-feedback"),
+    cooldownHours: parseNumber(import.meta.env.VITE_PRICE_FEEDBACK_COOLDOWN_HOURS, 12),
+  },
   map: {
     lightTilesUrl:
       import.meta.env.VITE_MAP_LIGHT_TILES_URL ??

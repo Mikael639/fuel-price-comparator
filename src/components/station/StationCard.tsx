@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { NavigationMenu } from "@/components/station/NavigationMenu";
+import { PriceFeedbackPanel } from "@/components/station/PriceFeedbackPanel";
 import { stationService } from "@/services/stationService";
 import { useFuelStationsStore } from "@/store/useFuelStationsStore";
 import { formatDistance, formatDriveTime, formatMoney, formatPrice, formatFreshness } from "@/utils/format";
@@ -150,6 +151,8 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
           </div>
         )}
 
+        <PriceFeedbackPanel compact displayedPrice={station.selectedFuelPrice} fuel={selectedFuel} stationId={station.id} />
+
         <div className="flex flex-col gap-4 pt-2">
            <div className="flex flex-col gap-3 sm:flex-row">
               <Button 
@@ -162,12 +165,12 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
               </Button>
               
               <Button 
-                variant="tonal" 
-                className={`h-11 w-full flex-1 rounded-xl ${useFuelStationsStore((state) => state.confirmedStationIds).includes(station.id) ? "bg-emerald-500/20 text-emerald-600 cursor-default" : ""}`}
-                disabled={useFuelStationsStore((state) => state.confirmedStationIds).includes(station.id)}
-                onClick={() => useFuelStationsStore.getState().confirmStationPrice(station.id)}
+                variant="outline" 
+                className="h-11 w-full flex-1 rounded-xl"
+                onClick={() => toggleFavorite(station.id)}
               >
-                {useFuelStationsStore((state) => state.confirmedStationIds).includes(station.id) ? "Prix confirme" : "Confirmer prix"}
+                <Star className={`h-4 w-4 ${station.isFavorite ? "fill-amber-400 text-amber-400" : ""}`} />
+                {station.isFavorite ? "En favorite" : "Ajouter favorite"}
               </Button>
            </div>
            
