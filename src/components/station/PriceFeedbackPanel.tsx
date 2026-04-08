@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckCircle2, CircleAlert, LoaderCircle, MessageSquareQuote } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ interface PriceFeedbackPanelProps {
   displayedPrice: number | null | undefined;
   compact?: boolean;
   eagerSummary?: boolean;
+  tone?: "default" | "inverse";
   className?: string;
 }
 
@@ -56,8 +57,12 @@ export const PriceFeedbackPanel = ({
   displayedPrice,
   compact = false,
   eagerSummary = false,
+  tone = "default",
   className,
 }: PriceFeedbackPanelProps) => {
+  const suggestedPriceInputId = useId();
+  const suggestedPriceHintId = `${suggestedPriceInputId}-hint`;
+  const suggestedPriceInputRef = useRef<HTMLInputElement | null>(null);
   const [summary, setSummary] = useState<PriceFeedbackSummary | null>(() => priceFeedbackService.peekSummary(stationId, fuel));
   const [showIncorrectForm, setShowIncorrectForm] = useState(false);
   const [suggestedPrice, setSuggestedPrice] = useState("");
@@ -124,7 +129,57 @@ export const PriceFeedbackPanel = ({
     };
   }, [fuel, stationId, cooldownTick]);
 
+  useEffect(() => {
+    if (!showIncorrectForm) {
+      return;
+    }
+
+    suggestedPriceInputRef.current?.focus();
+  }, [showIncorrectForm]);
+
   const cooldown = useMemo(() => priceFeedbackService.getLocalCooldown(stationId, fuel), [cooldownTick, fuel, stationId]);
+  const displayedPriceLabel = formatPrice(displayedPrice);
+  const helperCopy = compact
+    ? "Un prix vous semble faux ? Signalez-le et, si vous le connaissez, indiquez le prix observe a la pompe."
+    : "Confirmez si le prix affiche vous semble juste. Si ce n'est pas le cas, vous pouvez indiquer le prix observe a la pompe.";
+  const isInverse = tone === "inverse";
+
+  const containerClassName = isInverse
+    ? "border-white/10 bg-slate-950/60 text-white shadow-none"
+    : "border-slate-200/80 bg-white/75";
+  const bodyCopyClassName = isInverse ? "text-white/70" : "text-muted-foreground";
+  const loadingClassName = isInverse ? "text-white/60" : "text-muted-foreground";
+  const priceStripClassName = isInverse
+    ? "border-white/10 bg-white/10 text-white/70"
+    : "border-slate-200/80 bg-slate-50/70 text-muted-foreground";
+  const priceValueClassName = isInverse ? "text-white" : "text-foreground";
+  const summaryBadgeClassName = isInverse ? "border-white/10 bg-white/10 text-white" : "";
+  const confirmationBadgeClassName = isInverse ? "bg-emerald-500/20 text-emerald-100" : "";
+  const warningBadgeClassName = isInverse ? "bg-amber-400/20 text-amber-50" : "";
+  const correctButtonClassName = isInverse
+    ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20"
+    : "";
+  const incorrectButtonClassName = isInverse
+    ? "border-white/10 bg-white/10 text-white hover:bg-white/15"
+    : "";
+  const formPanelClassName = isInverse
+    ? "border-amber-300/20 bg-amber-400/10"
+    : "border-amber-400/20 bg-amber-500/5";
+  const formTitleClassName = isInverse ? "text-amber-200" : "text-amber-700 dark:text-amber-300";
+  const formCopyClassName = isInverse ? "text-white/70" : "text-muted-foreground";
+  const labelClassName = isInverse ? "text-white" : "text-foreground";
+  const inputClassName = isInverse
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-white/30 focus-visible:ring-emerald-400/60"
+    : "";
+  const hintClassName = isInverse ? "text-white/60" : "text-muted-foreground";
+  const cancelButtonClassName = isInverse ? "text-white hover:bg-white/10" : "";
+  const submitButtonClassName = isInverse ? "bg-amber-500 text-slate-950 hover:bg-amber-400" : "";
+  const alertClassNameByVariant: Record<Notice["variant"], string> = {
+    success: isInverse ? "border-emerald-400/20 bg-emerald-500/15 text-emerald-100" : "",
+    warning: isInverse ? "border-amber-300/20 bg-amber-400/15 text-amber-50" : "",
+    error: isInverse ? "border-red-300/20 bg-red-400/15 text-red-50" : "",
+    info: isInverse ? "border-sky-300/20 bg-sky-400/15 text-sky-50" : "",
+  };
 
   if (displayedPrice == null) {
     return null;
@@ -207,7 +262,8 @@ export const PriceFeedbackPanel = ({
   return (
     <div
       className={cn(
-        "rounded-[24px] border border-slate-200/80 bg-white/75 p-4 shadow-sm backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/35",
+        "rounded-[24px] border p-4 shadow-sm backdrop-blur-sm",
+        containerClassName,
         compact ? "space-y-3" : "space-y-4",
         className,
       )}
@@ -218,13 +274,13 @@ export const PriceFeedbackPanel = ({
             <MessageSquareQuote className="h-3.5 w-3.5" />
             Retour communaute
           </div>
-          <p className={cn("text-sm text-muted-foreground", compact && "text-xs leading-5")}>
-            Confirmez si le prix affiche vous semble juste. Le prix officiel reste prioritaire.
+          <p className={cn("text-sm", bodyCopyClassName, compact && "text-xs leading-5")}>
+            {helperCopy}
           </p>
         </div>
 
         {isLoadingSummary ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className={cn("flex items-center gap-2 text-xs", loadingClassName)}>
             <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
             Chargement
           </div>
@@ -234,21 +290,35 @@ export const PriceFeedbackPanel = ({
       {summaryHasSignal(summary) ? (
         <div className="flex flex-wrap gap-2">
           {summary && summary.confirmations > 0 ? (
-            <Badge variant="success">{summary.confirmations} confirmation(s)</Badge>
+            <Badge className={confirmationBadgeClassName} variant="success">
+              {summary.confirmations} confirmation(s)
+            </Badge>
           ) : null}
-          {summary && summary.reports > 0 ? <Badge variant="warning">{summary.reports} signalement(s)</Badge> : null}
+          {summary && summary.reports > 0 ? (
+            <Badge className={warningBadgeClassName} variant="warning">
+              {summary.reports} signalement(s)
+            </Badge>
+          ) : null}
           {summary?.suggestedPriceAverage != null ? (
-            <Badge variant="outline">Prix constate ~ {formatPrice(summary.suggestedPriceAverage)}</Badge>
+            <Badge className={summaryBadgeClassName} variant="outline">
+              Prix constate ~ {formatPrice(summary.suggestedPriceAverage)}
+            </Badge>
           ) : null}
           {!compact && summary?.latestFeedbackAt ? (
-            <Badge variant="outline">Dernier retour {formatDateTime(summary.latestFeedbackAt)}</Badge>
+            <Badge className={summaryBadgeClassName} variant="outline">
+              Dernier retour {formatDateTime(summary.latestFeedbackAt)}
+            </Badge>
           ) : null}
         </div>
       ) : null}
 
+      <div className={cn("rounded-[18px] border px-3 py-2 text-xs", priceStripClassName)}>
+        Prix officiel affiche pour {fuel} : <span className={cn("font-semibold", priceValueClassName)}>{displayedPriceLabel}</span>
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button
-          className="h-11 flex-1 rounded-xl"
+          className={cn("h-11 flex-1 rounded-xl", correctButtonClassName)}
           disabled={isSubmitting}
           onClick={() => void submitFeedback(true)}
           type="button"
@@ -259,50 +329,76 @@ export const PriceFeedbackPanel = ({
         </Button>
 
         <Button
-          className="h-11 flex-1 rounded-xl"
+          className={cn("h-11 flex-1 rounded-xl", incorrectButtonClassName)}
           disabled={isSubmitting}
           onClick={() => setShowIncorrectForm((currentValue) => !currentValue)}
           type="button"
           variant="outline"
         >
           <CircleAlert className="h-4 w-4" />
-          Prix incorrect
+          {showIncorrectForm ? "Fermer le signalement" : "Prix incorrect"}
         </Button>
       </div>
 
       {showIncorrectForm ? (
-        <div className="space-y-3 rounded-[20px] border border-amber-400/20 bg-amber-500/5 p-3">
+        <div className={cn("space-y-3 rounded-[20px] border p-3", formPanelClassName)}>
           <div className="space-y-1">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+            <p className={cn("text-xs font-bold uppercase tracking-[0.18em]", formTitleClassName)}>
               Signalement simple
             </p>
-            <p className="text-xs leading-5 text-muted-foreground">
-              Vous pouvez proposer le prix constate, sans obligation.
+            <p className={cn("text-xs leading-5", formCopyClassName)}>
+              Saisissez le prix vu a la pompe si vous l'avez. Le prix officiel reste la reference tant qu'il n'est pas mis a jour.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Input
-              className="h-11 rounded-xl"
-              inputMode="decimal"
-              onChange={(event) => setSuggestedPrice(event.target.value)}
-              placeholder="Prix constate, ex. 1,749"
-              value={suggestedPrice}
-            />
-            <Button
-              className="h-11 rounded-xl sm:min-w-[9rem]"
-              disabled={isSubmitting}
-              onClick={() => void submitFeedback(false)}
-              type="button"
-              variant="danger"
-            >
-              {isSubmitting ? "Envoi..." : "Envoyer"}
-            </Button>
+            <div className="flex-1 space-y-2">
+              <label className={cn("text-xs font-semibold", labelClassName)} htmlFor={suggestedPriceInputId}>
+                Prix observe a la pompe
+              </label>
+              <Input
+                className={cn("h-11 rounded-xl", inputClassName)}
+                id={suggestedPriceInputId}
+                inputMode="decimal"
+                onChange={(event) => setSuggestedPrice(event.target.value)}
+                placeholder="Ex. 1,679"
+                ref={suggestedPriceInputRef}
+                value={suggestedPrice}
+              />
+              <p className={cn("text-[11px] leading-5", hintClassName)} id={suggestedPriceHintId}>
+                Champ facultatif. Vous pouvez envoyer le signalement meme sans nouveau prix.
+              </p>
+            </div>
+            <div className="flex gap-3 sm:self-end">
+              <Button
+                className={cn("h-11 rounded-xl", cancelButtonClassName)}
+                disabled={isSubmitting}
+                onClick={() => setShowIncorrectForm(false)}
+                type="button"
+                variant="ghost"
+              >
+                Annuler
+              </Button>
+              <Button
+                aria-describedby={suggestedPriceHintId}
+                className={cn("h-11 rounded-xl sm:min-w-[11rem]", submitButtonClassName)}
+                disabled={isSubmitting}
+                onClick={() => void submitFeedback(false)}
+                type="button"
+                variant="danger"
+              >
+                {isSubmitting ? "Envoi..." : "Envoyer mon prix"}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {notice ? <Alert variant={notice.variant}>{notice.message}</Alert> : null}
+      {notice ? (
+        <Alert className={alertClassNameByVariant[notice.variant]} variant={notice.variant}>
+          {notice.message}
+        </Alert>
+      ) : null}
     </div>
   );
 };

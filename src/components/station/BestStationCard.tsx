@@ -121,12 +121,13 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
             </div>
 
             <PriceFeedbackPanel
-              className="border-white/10 bg-white/5 text-white dark:bg-white/5"
+              className="border-white/10 bg-white/5 dark:bg-white/5"
               compact
               displayedPrice={station.selectedFuelPrice}
               eagerSummary
               fuel={selectedFuel}
               stationId={station.id}
+              tone="inverse"
             />
           </div>
         </div>

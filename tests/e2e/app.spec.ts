@@ -98,6 +98,18 @@ const getDestinationInput = (page: Page) =>
   page.locator('input[aria-controls="destination-results"]');
 
 test.beforeEach(async ({ page }) => {
+  const feedbackSummary = {
+    stationId: "91170007",
+    fuel: "Diesel",
+    confirmations: 0,
+    reports: 0,
+    lastConfirmedAt: null,
+    lastReportedAt: null,
+    latestFeedbackAt: null,
+    latestSuggestedPrice: null,
+    suggestedPriceAverage: null,
+  };
+
   await page.route(
     "**/prix-des-carburants-en-france-flux-instantane-v2/records**",
     async (route) => {
@@ -149,6 +161,45 @@ test.beforeEach(async ({ page }) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(routePayload),
+    });
+  });
+
+  await page.route("**/api/price-feedback**", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          summary: feedbackSummary,
+          cooldownHours: 12,
+          storage: "memory",
+        }),
+      });
+      return;
+    }
+
+    const payload = route.request().postDataJSON();
+
+    if (payload?.isCorrect) {
+      feedbackSummary.confirmations += 1;
+      feedbackSummary.lastConfirmedAt = "2026-04-08T10:00:00.000Z";
+      feedbackSummary.latestFeedbackAt = feedbackSummary.lastConfirmedAt;
+    } else {
+      feedbackSummary.reports += 1;
+      feedbackSummary.lastReportedAt = "2026-04-08T10:00:00.000Z";
+      feedbackSummary.latestFeedbackAt = feedbackSummary.lastReportedAt;
+      feedbackSummary.latestSuggestedPrice = payload?.suggestedPrice ?? null;
+      feedbackSummary.suggestedPriceAverage = payload?.suggestedPrice ?? null;
+    }
+
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        summary: feedbackSummary,
+        cooldownHours: 12,
+        storage: "memory",
+      }),
     });
   });
 });
@@ -220,6 +271,46 @@ test("shows a friendly message when geocoding is rate limited", async ({
 
   await expect(
     page.getByText(/Le geocodeur public est temporairement limite/i),
+  ).toBeVisible();
+});
+
+test("lets a user report an incorrect price with an observed value", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await getDepartureInput(page).fill("Juvisy-sur-Orge");
+  await getDepartureInput(page).press("Enter");
+  await page
+    .getByRole("option", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" })
+    .click();
+
+  await page.getByRole("button", { name: "Prix incorrect" }).first().click();
+  await page
+    .getByLabel("Prix observe a la pompe")
+    .first()
+    .fill("1,679");
+
+  const feedbackRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes("/api/price-feedback") &&
+      request.method() === "POST",
+  );
+
+  await page.getByRole("button", { name: "Envoyer mon prix" }).first().click();
+
+  const submittedRequest = await feedbackRequest;
+
+  expect(submittedRequest.postDataJSON()).toMatchObject({
+    stationId: "91170007",
+    fuel: "Diesel",
+    displayedPrice: 1.688,
+    isCorrect: false,
+    suggestedPrice: 1.679,
+  });
+
+  await expect(
+    page.getByText(/Merci, votre signalement a ete enregistre/i).first(),
   ).toBeVisible();
 });
 

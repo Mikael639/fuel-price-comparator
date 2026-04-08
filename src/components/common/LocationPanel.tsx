@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { LoaderCircle, MapPin, Navigation, RefreshCw, Search, X, Flag } from "lucide-react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,114 @@ const getSourceLabel = (locationSource: LocationSource) => {
   }
 };
 
+interface SearchResultsOverlayProps {
+  anchorRef: RefObject<HTMLDivElement | null>;
+  listId: string;
+  results: GeocodingResult[];
+  activeIndex: number;
+  onSelectResult: (result: GeocodingResult) => void;
+  onHighlightResult: (index: number) => void;
+}
+
+type SearchResultsOverlayPosition = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+};
+
+const getOverlayPosition = (anchorElement: HTMLDivElement | null): SearchResultsOverlayPosition | null => {
+  if (!anchorElement || typeof window === "undefined") {
+    return null;
+  }
+
+  const rect = anchorElement.getBoundingClientRect();
+  const viewportPadding = 12;
+  const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
+  const left = Math.min(
+    Math.max(rect.left, viewportPadding),
+    Math.max(viewportPadding, window.innerWidth - width - viewportPadding),
+  );
+  const availableHeight = window.innerHeight - rect.bottom - viewportPadding;
+
+  return {
+    top: rect.bottom + 6,
+    left,
+    width,
+    maxHeight: Math.min(240, Math.max(144, availableHeight)),
+  };
+};
+
+const SearchResultsOverlay = ({
+  anchorRef,
+  listId,
+  results,
+  activeIndex,
+  onSelectResult,
+  onHighlightResult,
+}: SearchResultsOverlayProps) => {
+  const [position, setPosition] = useState<SearchResultsOverlayPosition | null>(null);
+
+  useEffect(() => {
+    if (results.length === 0) {
+      setPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      setPosition(getOverlayPosition(anchorRef.current));
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, results.length]);
+
+  if (results.length === 0 || !position || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      id={listId}
+      className="fixed z-[1200] overflow-y-auto overscroll-contain rounded-[20px] border border-border bg-card p-1 shadow-2xl shadow-slate-950/10"
+      role="listbox"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: position.width,
+        maxHeight: position.maxHeight,
+      }}
+    >
+      {results.map((result, index) => (
+        <button
+          aria-label={`${result.label} - ${result.city}`}
+          aria-selected={index === activeIndex}
+          className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
+            index === activeIndex ? "bg-muted" : "hover:bg-muted"
+          }`}
+          key={result.id}
+          onClick={() => onSelectResult(result)}
+          onMouseEnter={() => onHighlightResult(index)}
+          role="option"
+          type="button"
+        >
+          <span className="text-sm font-semibold">{`${result.label} - ${result.city}`}</span>
+          <span aria-hidden="true" className="text-xs text-muted-foreground">
+            {result.address}
+          </span>
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+};
+
 export const LocationPanel = ({
   isGeolocating,
   isSearchingLocation,
@@ -68,6 +177,8 @@ export const LocationPanel = ({
 }: LocationPanelProps) => {
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [activeRouteIndex, setActiveRouteIndex] = useState(-1);
+  const departureOverlayAnchorRef = useRef<HTMLDivElement | null>(null);
+  const destinationOverlayAnchorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setActiveSearchIndex(searchResults.length > 0 ? 0 : -1);
@@ -119,7 +230,7 @@ export const LocationPanel = ({
               <p className="text-xs text-muted-foreground">Recherchez votre ville ou une adresse précise.</p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2" ref={departureOverlayAnchorRef}>
               <div className="relative flex-1">
                 <Input
                   aria-controls="departure-results"
@@ -173,34 +284,6 @@ export const LocationPanel = ({
                 {isSearchingLocation ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
             </div>
-
-            {searchResults.length > 0 && (
-              <div
-                id="departure-results"
-                className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-[20px] border border-border bg-card p-1 shadow-lg"
-                role="listbox"
-              >
-                {searchResults.map((result, index) => (
-                  <button
-                    aria-label={`${result.label} - ${result.city}`}
-                    aria-selected={index === activeSearchIndex}
-                    className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
-                      index === activeSearchIndex ? "bg-muted" : "hover:bg-muted"
-                    }`}
-                    key={result.id}
-                    onClick={() => onSelectSearchResult(result)}
-                    onMouseEnter={() => setActiveSearchIndex(index)}
-                    role="option"
-                    type="button"
-                  >
-                    <span className="text-sm font-semibold">{`${result.label} - ${result.city}`}</span>
-                    <span aria-hidden="true" className="text-xs text-muted-foreground">
-                      {result.address}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           <div className="relative space-y-2 rounded-[24px] border border-border/70 bg-background/70 p-3 shadow-sm">
@@ -209,7 +292,7 @@ export const LocationPanel = ({
               <p className="text-xs text-muted-foreground">Ajoutez une arrivée pour comparer le trajet, pas seulement le point de départ.</p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2" ref={destinationOverlayAnchorRef}>
               <div className="relative flex-1">
                 <Input
                   aria-controls="destination-results"
@@ -272,34 +355,6 @@ export const LocationPanel = ({
               </Button>
             </div>
 
-            {routeResults.length > 0 && (
-              <div
-                id="destination-results"
-                className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-[20px] border border-border bg-card p-1 shadow-lg"
-                role="listbox"
-              >
-                {routeResults.map((result, index) => (
-                  <button
-                    aria-label={`${result.label} - ${result.city}`}
-                    aria-selected={index === activeRouteIndex}
-                    className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
-                      index === activeRouteIndex ? "bg-muted" : "hover:bg-muted"
-                    }`}
-                    key={result.id}
-                    onClick={() => onSelectRouteResult(result)}
-                    onMouseEnter={() => setActiveRouteIndex(index)}
-                    role="option"
-                    type="button"
-                  >
-                    <span className="text-sm font-semibold">{`${result.label} - ${result.city}`}</span>
-                    <span aria-hidden="true" className="text-xs text-muted-foreground">
-                      {result.address}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             {isLoadingRoute ? (
               <div className="rounded-2xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 dark:border-teal-900/40 dark:bg-teal-950/30 dark:text-teal-300">
                 Calcul du trajet en cours...
@@ -326,6 +381,24 @@ export const LocationPanel = ({
           {routeError ? <Alert variant="warning">{routeError}</Alert> : null}
         </div>
       </CardContent>
+
+      <SearchResultsOverlay
+        activeIndex={activeSearchIndex}
+        anchorRef={departureOverlayAnchorRef}
+        listId="departure-results"
+        onHighlightResult={setActiveSearchIndex}
+        onSelectResult={onSelectSearchResult}
+        results={searchResults}
+      />
+
+      <SearchResultsOverlay
+        activeIndex={activeRouteIndex}
+        anchorRef={destinationOverlayAnchorRef}
+        listId="destination-results"
+        onHighlightResult={setActiveRouteIndex}
+        onSelectResult={onSelectRouteResult}
+        results={routeResults}
+      />
     </Card>
   );
 };

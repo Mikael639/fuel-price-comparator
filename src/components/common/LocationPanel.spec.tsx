@@ -72,4 +72,20 @@ describe("LocationPanel", () => {
 
     expect(props.onSelectSearchResult).toHaveBeenCalledWith(props.searchResults[1]);
   });
+
+  it("renders search suggestions in a portal overlay", () => {
+    const props = buildProps();
+    props.searchQuery = "Massy";
+    props.searchResults = [
+      { ...baseResult, id: "2", label: "Massy", city: "Massy", address: "Massy, Essonne, France" },
+    ];
+
+    render(<LocationPanel {...props} />);
+
+    const resultsList = document.body.querySelector("#departure-results");
+
+    expect(resultsList).toBeTruthy();
+    expect(resultsList).toHaveClass("fixed");
+    expect(screen.getByRole("option", { name: "Massy - Massy" })).toBeVisible();
+  });
 });
