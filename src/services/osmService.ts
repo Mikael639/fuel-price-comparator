@@ -1,5 +1,5 @@
 import { appConfig } from "@/config/app";
-import { fetchJson } from "@/services/apiClient";
+import { ApiServiceError, fetchJson } from "@/services/apiClient";
 
 interface OsmElement {
   type: "node" | "way";
@@ -20,6 +20,11 @@ interface OverpassResponse {
   elements?: OsmElement[];
 }
 
+interface CacheEntry {
+  expiresAt: number;
+  value: string | null;
+}
+
 const buildBrandQuery = (lat: number, lng: number) => `
 [out:json][timeout:20];
 (
@@ -34,16 +39,70 @@ const getCoordinates = (element: OsmElement) => ({
   lng: element.lon ?? element.center?.lon ?? null,
 });
 
+const SUCCESS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const EMPTY_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const FAILURE_CACHE_TTL_MS = 10 * 60 * 1000;
+const RATE_LIMIT_COOLDOWN_MS = 15 * 60 * 1000;
+
 class OsmService {
-  private readonly brandCache = new Map<string, string | null>();
+  private readonly brandCache = new Map<string, CacheEntry>();
+  private readonly inFlightLookups = new Map<string, Promise<string | null>>();
+  private rateLimitedUntil = 0;
+
+  private getCachedValue(cacheKey: string) {
+    const entry = this.brandCache.get(cacheKey);
+
+    if (!entry) {
+      return undefined;
+    }
+
+    if (entry.expiresAt <= Date.now()) {
+      this.brandCache.delete(cacheKey);
+      return undefined;
+    }
+
+    return entry.value;
+  }
+
+  private setCachedValue(cacheKey: string, value: string | null, ttlMs: number) {
+    this.brandCache.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + ttlMs,
+    });
+  }
+
+  private startRateLimitCooldown() {
+    this.rateLimitedUntil = Math.max(this.rateLimitedUntil, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+  }
 
   async lookupFuelBrand(lat: number, lng: number) {
     const cacheKey = `${lat.toFixed(5)}:${lng.toFixed(5)}`;
+    const cachedValue = this.getCachedValue(cacheKey);
 
-    if (this.brandCache.has(cacheKey)) {
-      return this.brandCache.get(cacheKey) ?? null;
+    if (cachedValue !== undefined) {
+      return cachedValue;
     }
 
+    if (this.rateLimitedUntil > Date.now()) {
+      this.setCachedValue(cacheKey, null, RATE_LIMIT_COOLDOWN_MS);
+      return null;
+    }
+
+    const inFlightLookup = this.inFlightLookups.get(cacheKey);
+
+    if (inFlightLookup) {
+      return inFlightLookup;
+    }
+
+    const lookupPromise = this.fetchBrand(cacheKey, lat, lng).finally(() => {
+      this.inFlightLookups.delete(cacheKey);
+    });
+
+    this.inFlightLookups.set(cacheKey, lookupPromise);
+    return lookupPromise;
+  }
+
+  private async fetchBrand(cacheKey: string, lat: number, lng: number) {
     try {
       const payload = await fetchJson<OverpassResponse>(appConfig.osm.overpassUrl, {
         method: "POST",
@@ -52,7 +111,7 @@ class OsmService {
         },
         body: buildBrandQuery(lat, lng),
         timeoutMs: appConfig.osm.timeoutMs,
-        errorMessage: "La source OSM compl\u00e9mentaire est indisponible.",
+        errorMessage: "La source OSM complementaire est indisponible.",
       });
 
       const bestMatch = (payload.elements ?? [])
@@ -80,10 +139,16 @@ class OsmService {
         bestMatch?.element.tags?.name ??
         null;
 
-      this.brandCache.set(cacheKey, brand);
+      this.setCachedValue(cacheKey, brand, brand ? SUCCESS_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS);
       return brand;
-    } catch {
-      this.brandCache.set(cacheKey, null);
+    } catch (error) {
+      if (error instanceof ApiServiceError && error.status === 429) {
+        this.startRateLimitCooldown();
+        this.setCachedValue(cacheKey, null, RATE_LIMIT_COOLDOWN_MS);
+        return null;
+      }
+
+      this.setCachedValue(cacheKey, null, FAILURE_CACHE_TTL_MS);
       return null;
     }
   }

@@ -1,25 +1,21 @@
 import { fileURLToPath, URL } from "node:url";
-import vue from "@vitejs/plugin-vue";
+import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import vuetify from "vite-plugin-vuetify";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [
-    vue(),
-    vuetify({
-      autoImport: true,
-    }),
+    react(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "FuelFlash - Comparateur",
+        name: "FuelFlash - Comparateur Premium",
         short_name: "FuelFlash",
-        description: "Comparateur de prix des carburants en France",
+        description: "Le comparateur intelligent de prix des carburants en France",
         theme_color: "#0F766E",
-        background_color: "#ffffff",
+        background_color: "#0F172A",
         display: "standalone",
         start_url: "/",
         lang: "fr",
@@ -30,24 +26,6 @@ export default defineConfig({
             type: "image/svg+xml",
             purpose: "any",
           },
-          {
-            src: "pwa-192x192.png",
-            sizes: "192x192",
-            type: "image/png",
-            purpose: "any",
-          },
-          {
-            src: "pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-          {
-            src: "apple-touch-icon.png",
-            sizes: "180x180",
-            type: "image/png",
-            purpose: "any",
-          },
         ],
       },
       workbox: {
@@ -56,9 +34,9 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
-              url.pathname.startsWith("/fuel/") ||
-              url.pathname.startsWith("/geocode/") ||
-              url.pathname.startsWith("/europe/") ||
+              url.pathname.startsWith("/api/fuel/") ||
+              url.pathname.startsWith("/api/geocode/") ||
+              url.pathname.startsWith("/api/europe/") ||
               url.hostname === "data.economie.gouv.fr" ||
               url.hostname === "nominatim.openstreetmap.org" ||
               url.hostname === "overpass-api.de",
@@ -101,6 +79,23 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: {
+      "/api/fuel": {
+        target: "https://data.economie.gouv.fr",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/fuel/, "/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2"),
+      },
+      "/api/fuel-history": {
+        target: "https://data.economie.gouv.fr",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/fuel-history/, "/api/explore/v2.1/catalog/datasets/prix-carburants-quotidien"),
+      },
+      "/api/geocode": {
+        target: "https://nominatim.openstreetmap.org",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/geocode/, ""),
+      },
+    },
   },
   test: {
     environment: "jsdom",

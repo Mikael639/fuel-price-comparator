@@ -15,7 +15,17 @@ const stripTrailingSlash = (value: string | undefined) => {
   return value.replace(/\/+$/, "");
 };
 
-const proxyApiBaseUrl = stripTrailingSlash(import.meta.env.VITE_PROXY_API_BASE_URL);
+const normalizeProxyApiBaseUrl = (value: string | undefined) => {
+  const strippedValue = stripTrailingSlash(value);
+
+  if (!strippedValue) {
+    return "";
+  }
+
+  return strippedValue.endsWith("/api") ? strippedValue : `${strippedValue}/api`;
+};
+
+const proxyApiBaseUrl = normalizeProxyApiBaseUrl(import.meta.env.VITE_PROXY_API_BASE_URL);
 
 const withProxy = (path: string, fallback: string) => (proxyApiBaseUrl ? `${proxyApiBaseUrl}${path}` : fallback);
 
@@ -54,7 +64,10 @@ export const appConfig = {
     historyCacheTtlMs: parseNumber(import.meta.env.VITE_FUEL_API_HISTORY_CACHE_TTL_MS, 30 * 60 * 1000),
   },
   osm: {
-    overpassUrl: import.meta.env.VITE_OVERPASS_URL ?? "https://overpass-api.de/api/interpreter",
+    overpassUrl: withProxy(
+      "/osm/brand",
+      import.meta.env.VITE_OVERPASS_URL ?? "https://overpass-api.de/api/interpreter",
+    ),
     timeoutMs: parseNumber(import.meta.env.VITE_OVERPASS_TIMEOUT_MS, 8_000),
   },
   europe: {

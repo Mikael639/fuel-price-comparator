@@ -2,8 +2,18 @@ import { appConfig } from "@/config/app";
 import { europeFuelMarkets, type EuropeFuelMarketsPayload } from "@/data/europeFuelSnapshots";
 import { fetchJson } from "@/services/apiClient";
 
+const buildEuropeMarketsUrl = (forceRefresh = false) => {
+  if (!appConfig.europe.marketsUrl || !forceRefresh) {
+    return appConfig.europe.marketsUrl;
+  }
+
+  const requestUrl = new URL(appConfig.europe.marketsUrl, window.location.origin);
+  requestUrl.searchParams.set("refresh", "1");
+  return requestUrl.toString();
+};
+
 class EuropeFuelService {
-  async getMarkets(options?: { signal?: AbortSignal }): Promise<EuropeFuelMarketsPayload> {
+  async getMarkets(options?: { signal?: AbortSignal; forceRefresh?: boolean }): Promise<EuropeFuelMarketsPayload> {
     if (!appConfig.europe.marketsUrl) {
       return {
         markets: europeFuelMarkets,
@@ -14,7 +24,7 @@ class EuropeFuelService {
     }
 
     try {
-      const payload = await fetchJson<EuropeFuelMarketsPayload>(appConfig.europe.marketsUrl, {
+      const payload = await fetchJson<EuropeFuelMarketsPayload>(buildEuropeMarketsUrl(options?.forceRefresh), {
         signal: options?.signal,
         timeoutMs: appConfig.europe.timeoutMs,
         errorMessage: "Les donnees europeennes live sont indisponibles.",

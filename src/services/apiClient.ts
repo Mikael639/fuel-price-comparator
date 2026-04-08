@@ -75,7 +75,7 @@ export const fetchJson = async <T>(input: string, init?: FetchJsonOptions): Prom
     });
 
     if (!response.ok) {
-      throw new ApiServiceError(init?.errorMessage ?? `Requ\u00eate API indisponible (${response.status})`, {
+      throw new ApiServiceError(init?.errorMessage ?? `Requete API indisponible (${response.status})`, {
         status: response.status,
         code: "http",
       });
@@ -85,9 +85,9 @@ export const fetchJson = async <T>(input: string, init?: FetchJsonOptions): Prom
     try {
       return JSON.parse(text) as T;
     } catch {
-      console.error(`[apiClient] La r\u00e9ponse API n'est pas exploitable pour ${input}.`);
-      console.error(`[apiClient] Contenu re\u00e7u (100 premiers car.) : ${text.slice(0, 100)}`);
-      throw new ApiServiceError("La r\u00e9ponse API n'est pas exploitable.", {
+      console.error(`[apiClient] La reponse API n'est pas exploitable pour ${input}.`);
+      console.error(`[apiClient] Contenu recu (100 premiers car.) : ${text.slice(0, 100)}`);
+      throw new ApiServiceError("La reponse API n'est pas exploitable.", {
         code: "invalid_json",
       });
     }
@@ -98,14 +98,14 @@ export const fetchJson = async <T>(input: string, init?: FetchJsonOptions): Prom
 
     if (isAbortException(error)) {
       throw new ApiServiceError(
-        didTimeOut() ? "La requ\u00eate a expir\u00e9." : "La requ\u00eate a \u00e9t\u00e9 interrompue.",
+        didTimeOut() ? "La requete a expire." : "La requete a ete interrompue.",
         {
           code: didTimeOut() ? "timeout" : "aborted",
         },
       );
     }
 
-    throw new ApiServiceError(init?.errorMessage ?? "La requ\u00eate r\u00e9seau a \u00e9chou\u00e9.", {
+    throw new ApiServiceError(init?.errorMessage ?? "La requete reseau a echoue.", {
       code: "network",
     });
   } finally {

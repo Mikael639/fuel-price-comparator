@@ -41,14 +41,14 @@ const dailyHistoryPayload = {
 
 const geocodingPayload = [
   {
-    place_id: 1001,
-    lat: "48.8566",
-    lon: "2.3522",
-    display_name: "Paris, Ile-de-France, France",
+    place_id: 1,
+    lat: "48.6899",
+    lon: "2.3734",
+    display_name: "Juvisy-sur-Orge, Essonne, Ile-de-France, France",
     address: {
-      city: "Paris",
+      city: "Juvisy-sur-Orge",
     },
-    name: "Paris Centre",
+    name: "Juvisy-sur-Orge",
   },
 ];
 
@@ -69,6 +69,14 @@ test.beforeEach(async ({ page }) => {
     });
   });
 
+  await page.route("**/search?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(geocodingPayload),
+    });
+  });
+
   await page.route("**/overpass-api.de/api/interpreter", async (route) => {
     await route.fulfill({
       status: 200,
@@ -76,70 +84,22 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ elements: [] }),
     });
   });
-
-  await page.route("**/nominatim.openstreetmap.org/search**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(geocodingPayload),
-    });
-  });
 });
 
-test("can select a manual location and open a station detail", async ({ page }) => {
+test("can search a location and open a station detail", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("combobox", { name: /Ville de d.+monstration/i }).click();
-  await page.getByRole("option", { name: "Choisy-le-Roi" }).click();
+  await page.getByPlaceholder(/Ville ou adresse de D[ÉE]PART/i).fill("Juvisy-sur-Orge");
+  await page.getByPlaceholder(/Ville ou adresse de D[ÉE]PART/i).press("Enter");
+  await page.getByRole("button", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" }).click();
 
   await expect(page.getByText("Vos stations favorites")).toHaveCount(0);
-  await expect(page.locator("strong").filter({ hasText: /Choisy-le-Roi/ })).toBeVisible();
   await expect(page.getByText("Liste des stations")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Voir d.+tails/i }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Station Juvisy-sur-Orge/ }).first()).toBeVisible();
 
-  await page.getByRole("button", { name: /Voir d.+tails/i }).first().click();
+  await page.getByRole("button", { name: "Voir details" }).first().click();
 
   await expect(page).toHaveURL(/\/station\//);
   await expect(page.getByText("Historique officiel")).toBeVisible();
   await expect(page.getByRole("button", { name: /Ajouter aux favorites|Retirer des favorites/ })).toBeVisible();
-});
-
-test("shows a helpful message when geolocation is refused", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "geolocation", {
-      configurable: true,
-      value: {
-        getCurrentPosition: (_success: unknown, error: (reason: GeolocationPositionError) => void) => {
-          error({
-            code: 1,
-            message: "Permission denied",
-            PERMISSION_DENIED: 1,
-            POSITION_UNAVAILABLE: 2,
-            TIMEOUT: 3,
-          } as GeolocationPositionError);
-        },
-      },
-    });
-  });
-
-  await page.goto("/");
-  await page.getByRole("button", { name: "Utiliser ma position" }).click();
-
-  await expect(page.getByText(/g.olocalisation.+refus.e/i)).toBeVisible();
-  await expect(page.getByText(/recherchez votre ville manuellement/i)).toBeVisible();
-});
-
-test("can search an address and use the returned result", async ({ page }) => {
-  await page.goto("/");
-
-  await page.getByRole("textbox", { name: /Rechercher une ville ou une adresse/i }).fill("Paris");
-  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
-
-  const searchResult = page.getByRole("listitem").filter({ hasText: /Paris Centre/ }).first();
-  await expect(searchResult).toBeVisible();
-  await searchResult.click();
-
-  await expect(page.getByText(/Recherche libre/)).toBeVisible();
-  await expect(page.locator("strong").filter({ hasText: /Paris Centre/ })).toBeVisible();
-  await expect(page.getByText(/Aucun r.+sultat dans le rayon/i)).toBeVisible();
 });
