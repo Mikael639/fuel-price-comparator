@@ -53,8 +53,8 @@ describe("PriceFeedbackPanel", () => {
   it("uses explicit contrast classes in inverse tone", () => {
     render(<PriceFeedbackPanel compact displayedPrice={2.25} fuel="Diesel" stationId="station-1" tone="inverse" />);
 
-    expect(screen.getByText(/Prix officiel affiche pour Diesel/i)).toHaveClass("text-white/70");
-    expect(screen.getByRole("button", { name: /Prix correct/i })).toHaveClass("text-emerald-200");
+    expect(screen.getByText(/Prix officiel affiche pour Diesel/i)).toHaveClass("text-slate-200");
+    expect(screen.getByRole("button", { name: /Prix correct/i })).toHaveClass("text-emerald-50");
     expect(screen.getByRole("button", { name: /Prix incorrect/i })).toHaveClass("text-white");
   });
 

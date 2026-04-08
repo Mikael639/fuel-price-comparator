@@ -121,7 +121,7 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
             </div>
 
             <PriceFeedbackPanel
-              className="border-white/10 bg-white/5 dark:bg-white/5"
+              className="shadow-none"
               compact
               displayedPrice={station.selectedFuelPrice}
               eagerSummary

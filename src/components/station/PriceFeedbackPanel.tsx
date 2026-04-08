@@ -145,40 +145,40 @@ export const PriceFeedbackPanel = ({
   const isInverse = tone === "inverse";
 
   const containerClassName = isInverse
-    ? "border-white/10 bg-slate-950/60 text-white shadow-none"
+    ? "border-white/12 bg-slate-950/90 text-white shadow-[0_20px_45px_rgba(2,6,23,0.38)]"
     : "border-slate-200/80 bg-white/75";
-  const bodyCopyClassName = isInverse ? "text-white/70" : "text-muted-foreground";
-  const loadingClassName = isInverse ? "text-white/60" : "text-muted-foreground";
+  const bodyCopyClassName = isInverse ? "text-slate-200" : "text-muted-foreground";
+  const loadingClassName = isInverse ? "text-slate-300" : "text-muted-foreground";
   const priceStripClassName = isInverse
-    ? "border-white/10 bg-white/10 text-white/70"
+    ? "border-white/12 bg-slate-900/95 text-slate-200"
     : "border-slate-200/80 bg-slate-50/70 text-muted-foreground";
   const priceValueClassName = isInverse ? "text-white" : "text-foreground";
-  const summaryBadgeClassName = isInverse ? "border-white/10 bg-white/10 text-white" : "";
-  const confirmationBadgeClassName = isInverse ? "bg-emerald-500/20 text-emerald-100" : "";
-  const warningBadgeClassName = isInverse ? "bg-amber-400/20 text-amber-50" : "";
+  const summaryBadgeClassName = isInverse ? "border-white/12 bg-white/10 text-slate-50" : "";
+  const confirmationBadgeClassName = isInverse ? "border border-emerald-300/25 bg-emerald-500/18 text-emerald-50" : "";
+  const warningBadgeClassName = isInverse ? "border border-amber-300/25 bg-amber-400/18 text-amber-50" : "";
   const correctButtonClassName = isInverse
-    ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20"
+    ? "border border-emerald-300/30 bg-emerald-500/20 text-emerald-50 hover:bg-emerald-500/28"
     : "";
   const incorrectButtonClassName = isInverse
-    ? "border-white/10 bg-white/10 text-white hover:bg-white/15"
+    ? "border-white/12 bg-slate-900/95 text-white hover:bg-slate-800"
     : "";
   const formPanelClassName = isInverse
-    ? "border-amber-300/20 bg-amber-400/10"
+    ? "border-amber-300/25 bg-amber-400/12"
     : "border-amber-400/20 bg-amber-500/5";
   const formTitleClassName = isInverse ? "text-amber-200" : "text-amber-700 dark:text-amber-300";
-  const formCopyClassName = isInverse ? "text-white/70" : "text-muted-foreground";
+  const formCopyClassName = isInverse ? "text-slate-200" : "text-muted-foreground";
   const labelClassName = isInverse ? "text-white" : "text-foreground";
   const inputClassName = isInverse
-    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-white/30 focus-visible:ring-emerald-400/60"
+    ? "border-white/12 bg-slate-950 text-white placeholder:text-slate-400 focus-visible:ring-emerald-400/60"
     : "";
-  const hintClassName = isInverse ? "text-white/60" : "text-muted-foreground";
+  const hintClassName = isInverse ? "text-slate-300" : "text-muted-foreground";
   const cancelButtonClassName = isInverse ? "text-white hover:bg-white/10" : "";
   const submitButtonClassName = isInverse ? "bg-amber-500 text-slate-950 hover:bg-amber-400" : "";
   const alertClassNameByVariant: Record<Notice["variant"], string> = {
-    success: isInverse ? "border-emerald-400/20 bg-emerald-500/15 text-emerald-100" : "",
-    warning: isInverse ? "border-amber-300/20 bg-amber-400/15 text-amber-50" : "",
-    error: isInverse ? "border-red-300/20 bg-red-400/15 text-red-50" : "",
-    info: isInverse ? "border-sky-300/20 bg-sky-400/15 text-sky-50" : "",
+    success: isInverse ? "border-emerald-400/25 bg-emerald-500/18 text-emerald-50" : "",
+    warning: isInverse ? "border-amber-300/25 bg-amber-400/18 text-amber-50" : "",
+    error: isInverse ? "border-red-300/25 bg-red-400/18 text-red-50" : "",
+    info: isInverse ? "border-sky-300/25 bg-sky-400/18 text-sky-50" : "",
   };
 
   if (displayedPrice == null) {
