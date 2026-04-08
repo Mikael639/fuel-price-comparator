@@ -18,6 +18,15 @@ import type {
 } from "@/store/fuelStationsStore.types";
 import { persistLocation } from "@/store/fuelStationsStore.utils";
 
+type LegacyPersistedState = Omit<Partial<PersistedState>, "locationSource"> & {
+  locationSource?: string | null;
+};
+
+const hasNestedPersistedState = (
+  value: LegacyPersistedState | { state?: LegacyPersistedState } | undefined,
+): value is { state: LegacyPersistedState } =>
+  Boolean(value) && typeof value === "object" && "state" in value && value.state != null;
+
 export const useFuelStationsStore = create<FuelStationsState>()(
   persist(
     (...args) => ({
@@ -55,10 +64,6 @@ export const useFuelStationsStore = create<FuelStationsState>()(
         favoriteAlertPrice: state.favoriteAlertPrice,
       }),
       merge: (persistedState, currentState) => {
-        type LegacyPersistedState = Omit<Partial<PersistedState>, "locationSource"> & {
-          locationSource?: string | null;
-        };
-
         const persistedData = (
           persistedState as
             | {
@@ -68,7 +73,7 @@ export const useFuelStationsStore = create<FuelStationsState>()(
             | undefined
         ) ?? undefined;
         const persistedValue =
-          "state" in (persistedData ?? {}) && persistedData?.state
+          hasNestedPersistedState(persistedData)
             ? persistedData.state
             : (persistedData as LegacyPersistedState | undefined);
 

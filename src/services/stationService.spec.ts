@@ -7,7 +7,7 @@ import {
   stationService,
   sortStations,
 } from "@/services/stationService";
-import type { FuelStation, StationWithMetrics } from "@/types/station";
+import type { FuelStation, RoutePath, StationWithMetrics } from "@/types/station";
 
 const baseStation: FuelStation = {
   id: "1",
@@ -136,7 +136,7 @@ describe("stationService helpers", () => {
   });
 
   it("filters stations using the active route corridor", () => {
-    const routePath = {
+    const routePath: RoutePath = {
       origin: { lat: 48.8566, lng: 2.3522, label: "Paris" },
       destination: { lat: 48.8866, lng: 2.4322, label: "Noisy-le-Sec" },
       geometry: [
@@ -146,7 +146,7 @@ describe("stationService helpers", () => {
       ],
       distanceKm: 7.8,
       durationMinutes: 18,
-    } as const;
+    };
 
     const stations = stationService.findNearbyStations({
       stations: [
@@ -185,7 +185,7 @@ describe("stationService helpers", () => {
   });
 
   it("prefers a precise route detour when it is available", () => {
-    const routePath = {
+    const routePath: RoutePath = {
       origin: { lat: 48.6899, lng: 2.3734, label: "Juvisy" },
       destination: { lat: 48.7075, lng: 2.3928, label: "Athis-Mons" },
       geometry: [
@@ -195,7 +195,7 @@ describe("stationService helpers", () => {
       ],
       distanceKm: 6.2,
       durationMinutes: 13,
-    } as const;
+    };
 
     const stationWithPreciseDetour = stationService.findNearbyStations({
       stations: [

@@ -41,10 +41,16 @@ export const applyLocationState = (
 export const coordinatesMatch = (
   left: Coordinates | null | undefined,
   right: Coordinates | null | undefined,
-) =>
-  Boolean(left && right) &&
-  Math.abs(left.lat - right.lat) < 0.0001 &&
-  Math.abs(left.lng - right.lng) < 0.0001;
+) => {
+  if (!left || !right) {
+    return false;
+  }
+
+  return (
+    Math.abs(left.lat - right.lat) < 0.0001 &&
+    Math.abs(left.lng - right.lng) < 0.0001
+  );
+};
 
 export const isAbortedRequestError = (error: unknown) =>
   error instanceof ApiServiceError && error.code === "aborted";
