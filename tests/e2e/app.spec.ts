@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { PriceFeedbackSummary } from "@/types/priceFeedback";
 
 const nearbyStationsPayload = {
   results: [
@@ -98,7 +99,7 @@ const getDestinationInput = (page: Page) =>
   page.locator('input[aria-controls="destination-results"]');
 
 test.beforeEach(async ({ page }) => {
-  const feedbackSummary = {
+  const feedbackSummary: PriceFeedbackSummary = {
     stationId: "91170007",
     fuel: "Diesel",
     confirmations: 0,

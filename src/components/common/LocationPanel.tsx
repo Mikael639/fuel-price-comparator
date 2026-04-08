@@ -67,18 +67,30 @@ const getOverlayPosition = (anchorElement: HTMLDivElement | null): SearchResults
 
   const rect = anchorElement.getBoundingClientRect();
   const viewportPadding = 12;
+  const overlayGap = 6;
+  const minimumOverlayHeight = 120;
   const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
   const left = Math.min(
     Math.max(rect.left, viewportPadding),
     Math.max(viewportPadding, window.innerWidth - width - viewportPadding),
   );
-  const availableHeight = window.innerHeight - rect.bottom - viewportPadding;
+  const availableHeightBelow = window.innerHeight - rect.bottom - viewportPadding;
+  const availableHeightAbove = rect.top - viewportPadding;
+  const shouldOpenUpward =
+    availableHeightBelow < minimumOverlayHeight && availableHeightAbove > availableHeightBelow;
+  const maxHeight = Math.min(
+    240,
+    Math.max(minimumOverlayHeight, shouldOpenUpward ? availableHeightAbove : availableHeightBelow),
+  );
+  const top = shouldOpenUpward
+    ? Math.max(viewportPadding, rect.top - maxHeight - overlayGap)
+    : rect.bottom + overlayGap;
 
   return {
-    top: rect.bottom + 6,
+    top,
     left,
     width,
-    maxHeight: Math.min(240, Math.max(144, availableHeight)),
+    maxHeight,
   };
 };
 
