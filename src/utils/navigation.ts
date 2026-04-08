@@ -5,4 +5,4 @@ export const getWazeUrl = (lat: number, lng: number) =>
   `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
 
 export const getAppleMapsUrl = (lat: number, lng: number) =>
-  `http://maps.apple.com/?daddr=${lat},${lng}`;
+  `https://maps.apple.com/?daddr=${lat},${lng}`;

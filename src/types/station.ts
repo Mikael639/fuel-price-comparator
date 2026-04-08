@@ -24,6 +24,14 @@ export interface Coordinates {
   label?: string;
 }
 
+export interface RoutePath {
+  origin: Coordinates;
+  destination: Coordinates;
+  geometry: Coordinates[];
+  distanceKm: number;
+  durationMinutes: number;
+}
+
 export interface PersistedLocation extends Coordinates {
   source: Exclude<LocationSource, null>;
   savedAt: string;
@@ -56,6 +64,8 @@ export interface FuelStation {
   lastUpdatedAt: string | null;
   services: ServiceType[];
   dataOrigin?: "official" | "mock";
+  routeDetourKm?: number | null;
+  routeDetourMinutes?: number | null;
 }
 
 export interface GeocodingResult {
@@ -69,6 +79,7 @@ export interface GeocodingResult {
 
 export interface StationWithMetrics extends FuelStation {
   distanceKm: number;
+  distanceToRouteKm: number | null;
   selectedFuelPrice: number | null;
   estimatedDriveMinutes: number;
   savingsPerLiter: number | null;
@@ -79,6 +90,7 @@ export interface StationWithMetrics extends FuelStation {
   netSavingsForTank: number | null;
   priceTrend: PriceTrend;
   isRouteDetour: boolean;
+  hasAccurateRouteDetour: boolean;
 }
 
 export interface StationFilters {
@@ -96,6 +108,7 @@ export interface StationSearchParams extends StationFilters {
   fillVolumeLiters: number;
   consumptionLitersPer100Km: number;
   routePosition?: Coordinates | null;
+  routePath?: RoutePath | null;
 }
 
 export interface StationStats {

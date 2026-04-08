@@ -95,6 +95,7 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
           
           <div className="flex flex-col items-end gap-1">
             <button 
+              aria-label={station.isFavorite ? "Retirer des favorites" : "Ajouter aux favorites"}
               onClick={() => toggleFavorite(station.id)} 
               className="p-2 -mr-2 rounded-full hover:bg-primary/10 transition-colors"
               type="button"
@@ -118,7 +119,12 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white dark:bg-slate-800 shadow-sm text-primary">
               <MapPin className="h-4 w-4" />
             </div>
-            <span className="font-semibold">{formatDistance(station.distanceKm)}</span>
+            <div>
+              <span className="font-semibold block">{formatDistance(station.distanceKm)}</span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {station.isRouteDetour ? (station.hasAccurateRouteDetour ? "Detour reel" : "Detour estime") : "Distance"}
+              </span>
+            </div>
           </div>
           
           <div className="flex items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-900/50 p-2 text-sm">

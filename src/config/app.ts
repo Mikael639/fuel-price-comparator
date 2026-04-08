@@ -70,6 +70,10 @@ export const appConfig = {
     ),
     timeoutMs: parseNumber(import.meta.env.VITE_OVERPASS_TIMEOUT_MS, 8_000),
   },
+  routing: {
+    url: withProxy("/route", import.meta.env.VITE_ROUTING_URL ?? "https://router.project-osrm.org/route/v1/driving"),
+    timeoutMs: parseNumber(import.meta.env.VITE_ROUTING_TIMEOUT_MS, 12_000),
+  },
   europe: {
     marketsUrl: withProxy("/europe/markets", import.meta.env.VITE_EUROPE_MARKETS_URL ?? ""),
     timeoutMs: parseNumber(import.meta.env.VITE_EUROPE_TIMEOUT_MS, 12_000),

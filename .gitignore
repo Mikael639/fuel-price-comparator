@@ -35,6 +35,7 @@ Thumbs.db
 # local debug artifacts
 .vite-dev.err.log
 .vite-dev.out.log
+.codex-logs/
 
 # local secrets
 .local/

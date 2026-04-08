@@ -78,7 +78,7 @@ export const FilterBar = ({
         <div className="grid gap-4 md:gap-6 lg:grid-cols-[minmax(0,1fr)_260px_auto] lg:items-center">
           <div className="space-y-4 rounded-2xl bg-slate-100 p-4 dark:bg-slate-900/50">
             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <span>Perimetre de recherche</span>
+              <span>Perimetre d'analyse</span>
               <span className="text-primary">{radiusKm} km</span>
             </div>
             <Slider

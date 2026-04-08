@@ -1,6 +1,6 @@
 import type { GeocodingResult } from "@/types/station";
 import { appConfig } from "@/config/app";
-import { fetchJson } from "@/services/apiClient";
+import { ApiServiceError, fetchJson } from "@/services/apiClient";
 
 interface NominatimResult {
   place_id: number;
@@ -26,6 +26,8 @@ interface CacheEntry {
   expiresAt: number;
   results: GeocodingResult[];
 }
+
+const GEOCODING_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000;
 
 const buildGeocodingUrl = (query: string) => {
   const params = new URLSearchParams({
@@ -61,6 +63,7 @@ const toResult = (record: NominatimResult): GeocodingResult => {
 
 class GeocodingService {
   private readonly searchCache = new Map<string, CacheEntry>();
+  private rateLimitedUntil = 0;
 
   private getCachedResults(cacheKey: string) {
     const cachedEntry = this.searchCache.get(cacheKey);
@@ -91,19 +94,36 @@ class GeocodingService {
       return cachedResults;
     }
 
-    const payload = await fetchJson<NominatimResult[]>(buildGeocodingUrl(trimmedQuery), {
-      signal: options?.signal,
-      timeoutMs: appConfig.geocoding.timeoutMs,
-      errorMessage: "Le geocodage est indisponible pour le moment.",
-    });
+    if (!options?.forceRefresh && this.rateLimitedUntil > Date.now()) {
+      throw new Error("Le geocodeur public est temporairement limite. Reessayez dans quelques instants.");
+    }
 
-    const results = payload.map(toResult);
-    this.searchCache.set(cacheKey, {
-      expiresAt: Date.now() + appConfig.geocoding.cacheTtlMs,
-      results,
-    });
+    try {
+      const payload = await fetchJson<NominatimResult[]>(buildGeocodingUrl(trimmedQuery), {
+        signal: options?.signal,
+        timeoutMs: appConfig.geocoding.timeoutMs,
+        errorMessage: "Le geocodage est indisponible pour le moment.",
+      });
 
-    return results;
+      const results = payload.map(toResult);
+      this.searchCache.set(cacheKey, {
+        expiresAt: Date.now() + appConfig.geocoding.cacheTtlMs,
+        results,
+      });
+
+      return results;
+    } catch (error) {
+      if (error instanceof ApiServiceError && error.status === 429) {
+        this.rateLimitedUntil = Math.max(this.rateLimitedUntil, Date.now() + GEOCODING_RATE_LIMIT_COOLDOWN_MS);
+        throw new Error("Le geocodeur public est temporairement limite. Reessayez dans quelques instants.");
+      }
+
+      if (error instanceof ApiServiceError && error.status === 503) {
+        throw new Error("Le geocodage est temporairement indisponible. Reessayez dans quelques instants.");
+      }
+
+      throw error;
+    }
   }
 }
 

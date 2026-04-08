@@ -13,13 +13,19 @@ import type {
   PriceHistory,
   PriceHistoryPoint,
   PriceTrend,
+  RoutePath,
   ServiceType,
   SortMode,
   StationSearchParams,
   StationStats,
   StationWithMetrics,
 } from "@/types/station";
-import { estimateDriveTimeMinutes, haversineDistance } from "@/utils/geo";
+import {
+  estimateDriveTimeMinutes,
+  getDistanceToPolylineKm,
+  haversineDistance,
+  samplePolyline,
+} from "@/utils/geo";
 
 interface ParsedOpeningHourRange {
   "@ouverture": string;
@@ -527,6 +533,18 @@ const getDetourFuelCost = (
   isRoundTrip: boolean,
 ) => detourKm * (isRoundTrip ? 2 : 1) * (consumptionLitersPer100Km / 100) * fuelPrice;
 
+const ROUTE_SAMPLE_LIMIT = 10;
+
+const buildRouteSamplePoints = (routePath: RoutePath, corridorRadiusKm: number) => {
+  const spacingKm = Math.max(corridorRadiusKm * 1.6, 20);
+  const sampleCount = Math.min(
+    ROUTE_SAMPLE_LIMIT,
+    Math.max(2, Math.ceil(routePath.distanceKm / spacingKm) + 1),
+  );
+
+  return samplePolyline(routePath.geometry, sampleCount);
+};
+
 const buildMetrics = (
   station: FuelStation,
   position: Coordinates,
@@ -535,19 +553,27 @@ const buildMetrics = (
   favoriteIds: string[],
   fillVolumeLiters: number,
   consumptionLitersPer100Km: number,
+  routePath: RoutePath | null = null,
   routePosition: Coordinates | null = null,
 ): StationWithMetrics => {
   const stationCoords = { lat: station.lat, lng: station.lng };
-  const distanceKm = haversineDistance(position, stationCoords);
+  const distanceFromOriginKm = haversineDistance(position, stationCoords);
+  const distanceToRouteKm = routePath ? getDistanceToPolylineKm(stationCoords, routePath.geometry) : null;
+  const isRouteMode = Boolean(routePath || routePosition);
+  const accurateRouteDetourKm = routePath ? station.routeDetourKm ?? null : null;
+  const accurateRouteDetourMinutes = routePath ? station.routeDetourMinutes ?? null : null;
 
-  let effectiveDistanceKm = distanceKm;
-  let isRoundTrip = true;
+  let effectiveDistanceKm = distanceFromOriginKm;
 
-  if (routePosition) {
+  if (routePath) {
+    const stationToDestinationKm = haversineDistance(stationCoords, routePath.destination);
+    effectiveDistanceKm =
+      accurateRouteDetourKm ??
+      Math.max(0, distanceFromOriginKm + stationToDestinationKm - routePath.distanceKm);
+  } else if (routePosition) {
     const originToDestinationKm = haversineDistance(position, routePosition);
     const stationToDestinationKm = haversineDistance(stationCoords, routePosition);
-    effectiveDistanceKm = Math.max(0, distanceKm + stationToDestinationKm - originToDestinationKm);
-    isRoundTrip = false;
+    effectiveDistanceKm = Math.max(0, distanceFromOriginKm + stationToDestinationKm - originToDestinationKm);
   }
 
   const selectedFuelPrice = station.fuelPrices[fuel] ?? null;
@@ -556,7 +582,7 @@ const buildMetrics = (
   const estimatedFillCost = selectedFuelPrice != null ? selectedFuelPrice * fillVolumeLiters : null;
   const estimatedDetourCost =
     selectedFuelPrice != null
-      ? getDetourFuelCost(effectiveDistanceKm, selectedFuelPrice, consumptionLitersPer100Km, isRoundTrip)
+      ? getDetourFuelCost(effectiveDistanceKm, selectedFuelPrice, consumptionLitersPer100Km, !isRouteMode)
       : null;
   const netSavingsForTank =
     savingsPerLiter != null && estimatedDetourCost != null ? savingsPerLiter * fillVolumeLiters - estimatedDetourCost : null;
@@ -564,8 +590,9 @@ const buildMetrics = (
   return {
     ...station,
     distanceKm: effectiveDistanceKm,
+    distanceToRouteKm,
     selectedFuelPrice,
-    estimatedDriveMinutes: estimateDriveTimeMinutes(effectiveDistanceKm),
+    estimatedDriveMinutes: accurateRouteDetourMinutes ?? estimateDriveTimeMinutes(effectiveDistanceKm),
     savingsPerLiter,
     isFavorite: favoriteIds.includes(station.id),
     fillVolumeLiters,
@@ -573,7 +600,8 @@ const buildMetrics = (
     estimatedDetourCost,
     netSavingsForTank,
     priceTrend: stationService.getTrend(station, fuel),
-    isRouteDetour: !isRoundTrip,
+    isRouteDetour: isRouteMode,
+    hasAccurateRouteDetour: accurateRouteDetourKm != null && accurateRouteDetourMinutes != null,
   };
 };
 
@@ -689,10 +717,26 @@ class StationService {
     return fuelStations;
   }
 
+  getStationDistance(position: Coordinates, station: Pick<FuelStation, "lat" | "lng">) {
+    return haversineDistance(position, { lat: station.lat, lng: station.lng });
+  }
+
   async getStationsAround(position: Coordinates, radiusKm: number, options?: RequestOptions) {
     const records = await fuelApiService.getStationsAround(position, radiusKm, options);
     const stations = records.map(mapRecordToStation).filter((station): station is FuelStation => station != null);
     return dedupeStations(stations);
+  }
+
+  async getStationsAlongRoute(routePath: RoutePath, corridorRadiusKm: number, options?: RequestOptions) {
+    const samplePoints = buildRouteSamplePoints(routePath, corridorRadiusKm);
+    const stationGroups = await Promise.all(
+      samplePoints.map((point) => this.getStationsAround(point, corridorRadiusKm, options)),
+    );
+
+    return dedupeStations(stationGroups.flat()).filter((station) => {
+      const distanceToRouteKm = getDistanceToPolylineKm({ lat: station.lat, lng: station.lng }, routePath.geometry);
+      return distanceToRouteKm <= corridorRadiusKm;
+    });
   }
 
   async getStationById(id: string, options?: RequestOptions) {
@@ -775,14 +819,25 @@ class StationService {
     favoriteIds,
     fillVolumeLiters,
     consumptionLitersPer100Km,
+    routePath,
     routePosition,
   }: StationSearchParams): StationWithMetrics[] {
     const scopedStations = stations
-      .map((station) => ({
-        station,
-        distanceKm: haversineDistance(position, { lat: station.lat, lng: station.lng }),
-      }))
-      .filter((station) => station.distanceKm <= radiusKm)
+      .map((station) => {
+        const stationCoords = { lat: station.lat, lng: station.lng };
+        const originDistanceKm = haversineDistance(position, stationCoords);
+        const distanceToRouteKm = routePath
+          ? getDistanceToPolylineKm(stationCoords, routePath.geometry)
+          : routePosition
+            ? Math.min(originDistanceKm, haversineDistance(routePosition, stationCoords))
+            : originDistanceKm;
+
+        return {
+          station,
+          distanceToScopeKm: distanceToRouteKm,
+        };
+      })
+      .filter((station) => station.distanceToScopeKm <= radiusKm)
       .filter(({ station }) => !openOnly || station.isOpen)
       .filter(({ station }) =>
         services.length === 0 ? true : services.every((service) => station.services.includes(service)),
@@ -808,6 +863,7 @@ class StationService {
           favoriteIds,
           fillVolumeLiters,
           consumptionLitersPer100Km,
+          routePath ?? null,
           routePosition ?? null,
         ),
       ),
@@ -1093,8 +1149,8 @@ class StationService {
         id: "favorite-best",
         stationId: bestStation.id,
         severity: "success",
-        title: "Une favorite domine le rayon",
-        description: `${bestStation.name} est actuellement la meilleure option autour de vous.`,
+        title: "Une favorite domine la selection",
+        description: `${bestStation.name} est actuellement la meilleure option dans votre selection courante.`,
       });
     }
 

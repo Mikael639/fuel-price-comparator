@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const nearbyStationsPayload = {
   results: [
@@ -34,8 +34,18 @@ const nearbyStationsPayload = {
 
 const dailyHistoryPayload = {
   results: [
-    { id: "91170007", prix_nom: "Gazole", prix_valeur: 1.71, prix_maj: "2026-03-10T08:00:00.000Z" },
-    { id: "91170007", prix_nom: "SP95", prix_valeur: 1.8, prix_maj: "2026-03-10T08:00:00.000Z" },
+    {
+      id: "91170007",
+      prix_nom: "Gazole",
+      prix_valeur: 1.71,
+      prix_maj: "2026-03-10T08:00:00.000Z",
+    },
+    {
+      id: "91170007",
+      prix_nom: "SP95",
+      prix_valeur: 1.8,
+      prix_maj: "2026-03-10T08:00:00.000Z",
+    },
   ],
 };
 
@@ -52,14 +62,52 @@ const geocodingPayload = [
   },
 ];
 
+const routeGeocodingPayload = [
+  {
+    place_id: 2,
+    lat: "48.7075",
+    lon: "2.3928",
+    display_name: "Athis-Mons, Essonne, Ile-de-France, France",
+    address: {
+      city: "Athis-Mons",
+    },
+    name: "Athis-Mons",
+  },
+];
+
+const routePayload = {
+  routes: [
+    {
+      distance: 6200,
+      duration: 780,
+      geometry: {
+        coordinates: [
+          [2.3734, 48.6899],
+          [2.382, 48.6925],
+          [2.3928, 48.7075],
+        ],
+      },
+    },
+  ],
+};
+
+const getDepartureInput = (page: Page) =>
+  page.locator('input[aria-controls="departure-results"]');
+
+const getDestinationInput = (page: Page) =>
+  page.locator('input[aria-controls="destination-results"]');
+
 test.beforeEach(async ({ page }) => {
-  await page.route("**/prix-des-carburants-en-france-flux-instantane-v2/records**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(nearbyStationsPayload),
-    });
-  });
+  await page.route(
+    "**/prix-des-carburants-en-france-flux-instantane-v2/records**",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(nearbyStationsPayload),
+      });
+    },
+  );
 
   await page.route("**/prix-carburants-quotidien/records**", async (route) => {
     await route.fulfill({
@@ -70,10 +118,13 @@ test.beforeEach(async ({ page }) => {
   });
 
   await page.route("**/search?*", async (route) => {
+    const requestUrl = route.request().url().toLowerCase();
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(geocodingPayload),
+      body: JSON.stringify(
+        requestUrl.includes("athis") ? routeGeocodingPayload : geocodingPayload,
+      ),
     });
   });
 
@@ -84,22 +135,148 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ elements: [] }),
     });
   });
+
+  await page.route("**/route/v1/driving/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(routePayload),
+    });
+  });
+
+  await page.route("**/api/route**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(routePayload),
+    });
+  });
 });
 
 test("can search a location and open a station detail", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByPlaceholder(/Ville ou adresse de D[ÉE]PART/i).fill("Juvisy-sur-Orge");
-  await page.getByPlaceholder(/Ville ou adresse de D[ÉE]PART/i).press("Enter");
-  await page.getByRole("button", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" }).click();
+  await getDepartureInput(page).fill("Juvisy-sur-Orge");
+  await getDepartureInput(page).press("Enter");
+  await page
+    .getByRole("option", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" })
+    .click();
 
   await expect(page.getByText("Vos stations favorites")).toHaveCount(0);
   await expect(page.getByText("Liste des stations")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Station Juvisy-sur-Orge/ }).first()).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Station Juvisy-sur-Orge/ }).first(),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Voir details" }).first().click();
 
   await expect(page).toHaveURL(/\/station\//);
   await expect(page.getByText("Historique officiel")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Ajouter aux favorites|Retirer des favorites/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Ajouter aux favorites|Retirer des favorites/,
+    }),
+  ).toBeVisible();
+});
+
+test("can activate route mode with a destination", async ({ page }) => {
+  await page.goto("/");
+
+  await getDepartureInput(page).fill("Juvisy-sur-Orge");
+  await getDepartureInput(page).press("Enter");
+  await page
+    .getByRole("option", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" })
+    .click();
+
+  await getDestinationInput(page).fill("Athis-Mons");
+  await page.getByRole("option", { name: "Athis-Mons - Athis-Mons" }).click();
+
+  await expect(page.getByText("Trajet actif", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(/Stations visibles sur votre trajet/i),
+  ).toBeVisible();
+});
+
+test("shows a friendly message when geocoding is rate limited", async ({
+  page,
+}) => {
+  await page.route("**/search?*", async (route) => {
+    const requestUrl = route.request().url().toLowerCase();
+
+    if (requestUrl.includes("choisy")) {
+      await route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Too Many Requests" }),
+      });
+      return;
+    }
+
+    await route.fallback();
+  });
+
+  await page.goto("/");
+  await getDestinationInput(page).fill("Choisy");
+
+  await expect(
+    page.getByText(/Le geocodeur public est temporairement limite/i),
+  ).toBeVisible();
+});
+
+test("falls back to a simplified route comparison when routing is unavailable", async ({
+  page,
+}) => {
+  await page.route("**/route/v1/driving/**", async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "routing unavailable" }),
+    });
+  });
+
+  await page.goto("/");
+
+  await getDepartureInput(page).fill("Juvisy-sur-Orge");
+  await getDepartureInput(page).press("Enter");
+  await page
+    .getByRole("option", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" })
+    .click();
+
+  await getDestinationInput(page).fill("Athis-Mons");
+  await page.getByRole("option", { name: "Athis-Mons - Athis-Mons" }).click();
+
+  await expect(
+    page.getByText(/Comparaison simplifiee depart\/destination activee/i),
+  ).toBeVisible();
+  await expect(page.getByText(/Liste des stations/i)).toBeVisible();
+});
+
+test("keeps favorites after a page reload", async ({ page }) => {
+  await page.goto("/");
+
+  await getDepartureInput(page).fill("Juvisy-sur-Orge");
+  await getDepartureInput(page).press("Enter");
+  await page
+    .getByRole("option", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" })
+    .click();
+
+  await page
+    .getByRole("button", { name: /Ajouter aux favorites/i })
+    .first()
+    .click();
+  await expect(page.getByText("Vos stations favorites")).toBeVisible();
+  await page.waitForTimeout(500);
+
+  await page.reload();
+
+  await getDepartureInput(page).fill("Juvisy-sur-Orge");
+  await getDepartureInput(page).press("Enter");
+  await page
+    .getByRole("option", { name: "Juvisy-sur-Orge - Juvisy-sur-Orge" })
+    .click();
+
+  await expect(page.getByText("Vos stations favorites")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Retirer des favorites/i }).first(),
+  ).toBeVisible();
 });
