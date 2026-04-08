@@ -25,7 +25,7 @@ const createHistorySeries = (values: number[]) =>
 const services = (...items: ServiceType[]) => items;
 
 const createStation = (
-  station: Omit<FuelStation, "fuels" | "priceHistory" | "brandSource" | "dataOrigin" | "priceUpdatedAt" | "lastUpdatedAt"> & {
+  station: Omit<FuelStation, "fuels" | "priceHistory" | "brandSource" | "priceUpdatedAt" | "lastUpdatedAt"> & {
     fuelPrices: FuelPrices;
     history: Partial<Record<FuelType, number[]>>;
   },
@@ -38,31 +38,17 @@ const createStation = (
     {},
   );
 
-  const priceUpdatedAt = Object.entries(priceHistory).reduce<Partial<Record<FuelType, string>>>(
-    (updates, [fuel, historyPoints]) => {
-      const latestPoint = historyPoints.at(-1);
-
-      if (latestPoint) {
-        updates[fuel as FuelType] = latestPoint.date;
-      }
-
-      return updates;
-    },
-    {},
-  );
-
-  const lastUpdatedAt =
-    Object.values(priceUpdatedAt)
-      .filter((value): value is string => Boolean(value))
-      .sort()
-      .at(-1) ?? null;
+  const now = new Date().toISOString();
+  const priceUpdatedAt = Object.keys(station.fuelPrices).reduce((acc, fuel) => {
+    acc[fuel as FuelType] = now;
+    return acc;
+  }, {} as Partial<Record<FuelType, string>>);
 
   return {
     id: station.id,
     name: station.name,
     brand: station.brand,
     brandSource: "mock",
-    dataOrigin: "mock",
     address: station.address,
     city: station.city,
     lat: station.lat,
@@ -72,9 +58,10 @@ const createStation = (
     fuelPrices: station.fuelPrices,
     fuels: Object.keys(station.fuelPrices) as FuelType[],
     priceHistory,
-    priceUpdatedAt,
-    lastUpdatedAt,
     services: station.services,
+    dataOrigin: "mock",
+    lastUpdatedAt: now,
+    priceUpdatedAt,
   };
 };
 
@@ -101,7 +88,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.746, 1.742, 1.739, 1.736, 1.734, 1.731, 1.729],
       E85: [0.973, 0.971, 0.968, 0.966, 0.964, 0.962, 0.959],
     },
-    services: services("Supérette", "Toilettes", "Gonflage"),
+    services: services("Superette", "Toilettes", "Gonflage"),
   }),
   createStation({
     id: "station-nation-esso",
@@ -149,7 +136,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.747, 1.746, 1.744, 1.743, 1.741, 1.74, 1.739],
       E85: [0.991, 0.988, 0.986, 0.984, 0.982, 0.98, 0.979],
     },
-    services: services("Supérette", "Lavage", "Toilettes"),
+    services: services("Superette", "Lavage", "Toilettes"),
   }),
   createStation({
     id: "station-levallois-carrefour",
@@ -173,7 +160,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.934, 0.931, 0.928, 0.925, 0.923, 0.921, 0.919],
       GPL: [1.061, 1.059, 1.057, 1.055, 1.053, 1.051, 1.049],
     },
-    services: services("Supérette", "Lavage", "Borne de recharge"),
+    services: services("Superette", "Lavage", "Borne de recharge"),
   }),
   createStation({
     id: "station-defense-shell",
@@ -184,7 +171,7 @@ export const fuelStations: FuelStation[] = [
     lat: 48.8924,
     lng: 2.2364,
     isOpen: false,
-    openingHours: "Fermée jusqu'à 06:00",
+    openingHours: "Fermee jusqu'a 06:00",
     fuelPrices: {
       SP95: 1.889,
       SP98: 1.949,
@@ -195,7 +182,7 @@ export const fuelStations: FuelStation[] = [
       SP98: [1.936, 1.938, 1.94, 1.942, 1.944, 1.947, 1.949],
       Diesel: [1.754, 1.757, 1.759, 1.761, 1.764, 1.766, 1.769],
     },
-    services: services("Supérette", "Toilettes"),
+    services: services("Superette", "Toilettes"),
   }),
   createStation({
     id: "station-ivry-bp",
@@ -243,7 +230,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.722, 1.719, 1.716, 1.714, 1.712, 1.71, 1.709],
       E85: [0.961, 0.958, 0.956, 0.954, 0.952, 0.95, 0.949],
     },
-    services: services("Supérette", "Toilettes", "Borne de recharge"),
+    services: services("Superette", "Toilettes", "Borne de recharge"),
   }),
   createStation({
     id: "station-clichy-intermarche",
@@ -267,7 +254,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.708, 1.703, 1.699, 1.696, 1.693, 1.691, 1.689],
       E85: [0.915, 0.912, 0.909, 0.906, 0.904, 0.901, 0.899],
     },
-    services: services("Supérette", "Lavage", "Station 24h/24"),
+    services: services("Superette", "Lavage", "Station 24h/24"),
   }),
   createStation({
     id: "station-issy-leclerc",
@@ -291,7 +278,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.905, 0.901, 0.898, 0.896, 0.893, 0.891, 0.889],
       GPL: [1.043, 1.04, 1.037, 1.035, 1.033, 1.031, 1.029],
     },
-    services: services("Supérette", "Borne de recharge", "Gonflage"),
+    services: services("Superette", "Borne de recharge", "Gonflage"),
   }),
   createStation({
     id: "station-bercy-auchan",
@@ -317,7 +304,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.939, 0.936, 0.934, 0.931, 0.929, 0.927, 0.925],
       GPL: [1.048, 1.045, 1.043, 1.041, 1.039, 1.037, 1.035],
     },
-    services: services("Supérette", "Toilettes", "Borne de recharge"),
+    services: services("Superette", "Toilettes", "Borne de recharge"),
   }),
   createStation({
     id: "station-montrouge-q8",
@@ -328,7 +315,7 @@ export const fuelStations: FuelStation[] = [
     lat: 48.8189,
     lng: 2.3176,
     isOpen: false,
-    openingHours: "Fermée jusqu'à 07:00",
+    openingHours: "Fermee jusqu'a 07:00",
     fuelPrices: {
       SP95: 1.829,
       SP98: 1.899,
@@ -365,7 +352,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.715, 1.712, 1.709, 1.706, 1.704, 1.701, 1.699],
       E85: [0.952, 0.949, 0.947, 0.945, 0.943, 0.941, 0.939],
     },
-    services: services("Supérette", "Station 24h/24", "Toilettes"),
+    services: services("Superette", "Station 24h/24", "Toilettes"),
   }),
   createStation({
     id: "station-boulogne-shell",
@@ -389,7 +376,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.734, 1.737, 1.739, 1.741, 1.744, 1.746, 1.749],
       GPL: [1.084, 1.086, 1.088, 1.091, 1.094, 1.096, 1.099],
     },
-    services: services("Supérette", "Lavage"),
+    services: services("Superette", "Lavage"),
   }),
   createStation({
     id: "station-pantin-esso",
@@ -439,7 +426,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.93, 0.927, 0.924, 0.922, 0.919, 0.917, 0.915],
       GPL: [1.058, 1.055, 1.052, 1.05, 1.048, 1.046, 1.045],
     },
-    services: services("Supérette", "Lavage", "Toilettes"),
+    services: services("Superette", "Lavage", "Toilettes"),
   }),
   createStation({
     id: "station-charenton-carrefour",
@@ -465,7 +452,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.92, 0.917, 0.914, 0.912, 0.91, 0.907, 0.905],
       GPL: [1.044, 1.042, 1.039, 1.037, 1.035, 1.033, 1.031],
     },
-    services: services("Supérette", "Borne de recharge", "Station 24h/24"),
+    services: services("Superette", "Borne de recharge", "Station 24h/24"),
   }),
   createStation({
     id: "station-creteil-bp",
@@ -537,7 +524,7 @@ export const fuelStations: FuelStation[] = [
       Diesel: [1.714, 1.711, 1.708, 1.706, 1.703, 1.701, 1.699],
       E85: [0.933, 0.931, 0.928, 0.926, 0.924, 0.921, 0.919],
     },
-    services: services("Supérette", "Lavage", "Toilettes"),
+    services: services("Superette", "Lavage", "Toilettes"),
   }),
   createStation({
     id: "station-savigny-carrefour",
@@ -563,7 +550,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.905, 0.902, 0.9, 0.897, 0.895, 0.893, 0.891],
       GPL: [1.043, 1.04, 1.038, 1.036, 1.034, 1.032, 1.029],
     },
-    services: services("Supérette", "Borne de recharge", "Station 24h/24"),
+    services: services("Superette", "Borne de recharge", "Station 24h/24"),
   }),
   createStation({
     id: "station-viry-avia",
@@ -589,7 +576,7 @@ export const fuelStations: FuelStation[] = [
       E85: [0.91, 0.907, 0.905, 0.902, 0.9, 0.898, 0.896],
       GPL: [1.047, 1.044, 1.042, 1.04, 1.038, 1.036, 1.034],
     },
-    services: services("Supérette", "Toilettes", "Gonflage"),
+    services: services("Superette", "Toilettes", "Gonflage"),
   }),
   createStation({
     id: "station-paray-leclerc",
@@ -613,6 +600,6 @@ export const fuelStations: FuelStation[] = [
       E85: [0.901, 0.898, 0.896, 0.893, 0.891, 0.889, 0.887],
       GPL: [1.039, 1.036, 1.034, 1.032, 1.03, 1.028, 1.026],
     },
-    services: services("Supérette", "Borne de recharge", "Gonflage"),
+    services: services("Superette", "Borne de recharge", "Gonflage"),
   }),
 ];

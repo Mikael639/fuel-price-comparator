@@ -29,6 +29,7 @@ export interface ApiStationRecord {
   e10_maj?: string | null;
   carburants_disponibles?: string[] | null;
   carburants_indisponibles?: string[] | null;
+  prix_maj?: string | null;
 }
 
 interface ApiRecordsResponse {

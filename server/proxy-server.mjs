@@ -3,6 +3,7 @@ import { URL } from "node:url";
 import XLSX from "xlsx";
 
 const PORT = Number(process.env.PORT ?? 8787);
+const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
 const DGCCRF_RECORDS_URL =
   "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
 const DGCCRF_HISTORY_URL =
@@ -20,10 +21,13 @@ const EUROPE_COUNTRIES = {
 };
 
 const cache = new Map();
+const OSM_BRAND_FAILURE_TTL_MS = 10 * 60 * 1000;
+const OSM_BRAND_RATE_LIMIT_TTL_MS = 15 * 60 * 1000;
+let osmRateLimitedUntil = 0;
 
 const setCorsHeaders = (response) => {
   response.setHeader("Access-Control-Allow-Origin", "*");
-  response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 };
 
@@ -57,15 +61,86 @@ const setCachedValue = (key, value, ttlMs) => {
   });
 };
 
+class ProxyHttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.name = "ProxyHttpError";
+    this.status = status;
+  }
+}
+
+const readRequestBody = (request) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+
+    request.on("data", (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    request.on("end", () => {
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+
+    request.on("error", reject);
+  });
+
 const proxyJsonRequest = async (targetUrl, init = {}) => {
   const response = await fetch(targetUrl, init);
   const payload = await response.text();
 
   if (!response.ok) {
-    throw new Error(payload || `Proxy upstream error (${response.status})`);
+    throw new ProxyHttpError(response.status, payload || `Proxy upstream error (${response.status})`);
   }
 
   return JSON.parse(payload);
+};
+
+const proxyOsmBrandLookup = async (query) => {
+  const normalizedQuery = query.trim();
+
+  if (!normalizedQuery) {
+    return { elements: [] };
+  }
+
+  const cacheKey = `osm-brand:${normalizedQuery}`;
+  const cachedPayload = getCachedValue(cacheKey);
+
+  if (cachedPayload) {
+    return cachedPayload;
+  }
+
+  if (osmRateLimitedUntil > Date.now()) {
+    return { elements: [] };
+  }
+
+  try {
+    const payload = await proxyJsonRequest(OVERPASS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8",
+        "User-Agent": "FuelFlashProxy/1.0",
+      },
+      body: normalizedQuery,
+    });
+
+    setCachedValue(cacheKey, payload, 24 * 60 * 60 * 1000);
+    return payload;
+  } catch (error) {
+    if (error instanceof ProxyHttpError && error.status === 429) {
+      osmRateLimitedUntil = Math.max(osmRateLimitedUntil, Date.now() + OSM_BRAND_RATE_LIMIT_TTL_MS);
+      console.warn("[proxy] OSM rate limit reached. Brand enrichment paused temporarily.");
+      const fallbackPayload = { elements: [] };
+      setCachedValue(cacheKey, fallbackPayload, OSM_BRAND_RATE_LIMIT_TTL_MS);
+      return fallbackPayload;
+    }
+
+    console.warn(
+      `[proxy] OSM brand lookup unavailable: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+    const fallbackPayload = { elements: [] };
+    setCachedValue(cacheKey, fallbackPayload, OSM_BRAND_FAILURE_TTL_MS);
+    return fallbackPayload;
+  }
 };
 
 const excelDateToIso = (value) => {
@@ -82,8 +157,8 @@ const excelDateToIso = (value) => {
   return new Date(Date.UTC(parsedDate.y, parsedDate.m - 1, parsedDate.d)).toISOString();
 };
 
-const buildEuropeMarketsPayload = async () => {
-  const cachedPayload = getCachedValue("europe-markets");
+const buildEuropeMarketsPayload = async ({ forceRefresh = false } = {}) => {
+  const cachedPayload = forceRefresh ? null : getCachedValue("europe-markets");
 
   if (cachedPayload) {
     return cachedPayload;
@@ -148,14 +223,26 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method !== "GET" || !request.url) {
-    sendJson(response, 405, { error: "Method not allowed" });
+  if (!request.url) {
+    sendJson(response, 400, { error: "Missing URL" });
     return;
   }
 
   const url = new URL(request.url, `http://localhost:${PORT}`);
 
   try {
+    if (request.method === "POST" && url.pathname === "/api/osm/brand") {
+      const query = await readRequestBody(request);
+      const payload = await proxyOsmBrandLookup(query);
+      sendJson(response, 200, payload);
+      return;
+    }
+
+    if (request.method !== "GET") {
+      sendJson(response, 405, { error: "Method not allowed" });
+      return;
+    }
+
     if (url.pathname === "/health") {
       sendJson(response, 200, { ok: true });
       return;
@@ -192,7 +279,9 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/europe/markets") {
-      const payload = await buildEuropeMarketsPayload();
+      const payload = await buildEuropeMarketsPayload({
+        forceRefresh: url.searchParams.get("refresh") === "1",
+      });
       sendJson(response, 200, payload);
       return;
     }

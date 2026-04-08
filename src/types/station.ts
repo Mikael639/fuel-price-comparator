@@ -1,7 +1,6 @@
-export const FUEL_TYPES = ["SP95", "SP98", "Diesel", "E85", "GPL"] as const;
-export const ENERGY_TYPES = ["carburant", "electrique"] as const;
+export const FUEL_TYPES = ["SP95", "SP95-E10", "SP98", "Diesel", "E85", "GPL"] as const;
 export const SERVICE_TYPES = [
-  "Supérette",
+  "Superette",
   "Lavage",
   "Gonflage",
   "Toilettes",
@@ -11,11 +10,10 @@ export const SERVICE_TYPES = [
 export const SORT_MODES = ["price", "distance", "savings", "smartFill", "favorites"] as const;
 
 export type FuelType = (typeof FUEL_TYPES)[number];
-export type EnergyType = (typeof ENERGY_TYPES)[number];
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 export type SortMode = (typeof SORT_MODES)[number];
 export type PriceTrend = "up" | "down" | "stable";
-export type LocationSource = "browser" | "manual" | "demo" | "search" | null;
+export type LocationSource = "browser" | "search" | null;
 export type ThemeName = "fuelLight" | "fuelDark";
 export type BrandSource = "mock" | "inferred" | "osm" | "not_provided";
 export type FavoriteAlertSeverity = "success" | "info" | "warning";
@@ -45,7 +43,6 @@ export interface FuelStation {
   name: string;
   brand: string;
   brandSource: BrandSource;
-  dataOrigin: "official" | "mock";
   address: string;
   city: string;
   lat: number;
@@ -58,14 +55,7 @@ export interface FuelStation {
   priceUpdatedAt: Partial<Record<FuelType, string>>;
   lastUpdatedAt: string | null;
   services: ServiceType[];
-}
-
-export interface MockLocation {
-  id: string;
-  label: string;
-  city: string;
-  lat: number;
-  lng: number;
+  dataOrigin?: "official" | "mock";
 }
 
 export interface GeocodingResult {
@@ -82,33 +72,30 @@ export interface StationWithMetrics extends FuelStation {
   selectedFuelPrice: number | null;
   estimatedDriveMinutes: number;
   savingsPerLiter: number | null;
+  isFavorite: boolean;
   fillVolumeLiters: number;
   estimatedFillCost: number | null;
   estimatedDetourCost: number | null;
   netSavingsForTank: number | null;
-  isFavorite: boolean;
-  priceTrend?: PriceTrend;
-  isConfirmed?: boolean;
-  isRouteDetour?: boolean;
+  priceTrend: PriceTrend;
+  isRouteDetour: boolean;
 }
 
 export interface StationFilters {
-  energyType: EnergyType;
   fuel: FuelType;
   radiusKm: number;
   openOnly: boolean;
-  selectedServices: ServiceType[];
+  services: ServiceType[];
   sortMode: SortMode;
   favoriteIds: string[];
-  tankVolumeLiters: number;
-  consumptionLitersPer100Km: number;
-  routeDestination?: string | null;
 }
 
 export interface StationSearchParams extends StationFilters {
   position: Coordinates;
-  routePosition?: Coordinates | null;
   stations: FuelStation[];
+  fillVolumeLiters: number;
+  consumptionLitersPer100Km: number;
+  routePosition?: Coordinates | null;
 }
 
 export interface StationStats {
@@ -119,6 +106,11 @@ export interface StationStats {
   maxNetSavings: number | null;
   freshestPriceUpdate: string | null;
   staleCount: number;
+}
+
+export interface RouteResult {
+  destination: string;
+  position: Coordinates;
 }
 
 export interface FavoriteAlert {

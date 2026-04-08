@@ -1,4 +1,4 @@
-import { config } from "@vue/test-utils";
+import "@testing-library/jest-dom/vitest";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -13,7 +13,3 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
-
-config.global.stubs = {
-  transition: false,
-};

@@ -47,7 +47,7 @@ const toResult = (record: NominatimResult): GeocodingResult => {
     record.address?.village ??
     record.address?.municipality ??
     record.address?.county ??
-    "Lieu recherch\u00e9";
+    "Lieu recherche";
 
   return {
     id: String(record.place_id),
@@ -94,7 +94,7 @@ class GeocodingService {
     const payload = await fetchJson<NominatimResult[]>(buildGeocodingUrl(trimmedQuery), {
       signal: options?.signal,
       timeoutMs: appConfig.geocoding.timeoutMs,
-      errorMessage: "Le g\u00e9ocodage est indisponible pour le moment.",
+      errorMessage: "Le geocodage est indisponible pour le moment.",
     });
 
     const results = payload.map(toResult);
