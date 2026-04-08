@@ -1,17 +1,9 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import {
-  createLocationSlice,
-} from "@/store/slices/locationSlice";
-import {
-  createPreferencesSlice,
-} from "@/store/slices/preferencesSlice";
-import {
-  createRouteSlice,
-} from "@/store/slices/routeSlice";
-import {
-  createStationsSlice,
-} from "@/store/slices/stationsSlice";
+import { createLocationSlice } from "@/store/slices/locationSlice";
+import { createPreferencesSlice } from "@/store/slices/preferencesSlice";
+import { createRouteSlice } from "@/store/slices/routeSlice";
+import { createStationsSlice } from "@/store/slices/stationsSlice";
 import type {
   FuelStationsState,
   PersistedState,
@@ -72,10 +64,9 @@ export const useFuelStationsStore = create<FuelStationsState>()(
             | LegacyPersistedState
             | undefined
         ) ?? undefined;
-        const persistedValue =
-          hasNestedPersistedState(persistedData)
-            ? persistedData.state
-            : (persistedData as LegacyPersistedState | undefined);
+        const persistedValue = hasNestedPersistedState(persistedData)
+          ? persistedData.state
+          : (persistedData as LegacyPersistedState | undefined);
 
         if (!persistedValue) {
           return currentState;

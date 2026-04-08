@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { NavigationMenu } from "@/components/station/NavigationMenu";
+import { PriceFeedbackPanel } from "@/components/station/PriceFeedbackPanel";
 import { stationService } from "@/services/stationService";
 import { useFuelStationsStore } from "@/store/useFuelStationsStore";
 import { formatDistance, formatDriveTime, formatMoney, formatPrice, formatFreshness } from "@/utils/format";
@@ -118,6 +119,15 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] px-1">Navigation GPS</p>
               <NavigationMenu className="w-full" lat={station.lat} lng={station.lng} tone="inverse" />
             </div>
+
+            <PriceFeedbackPanel
+              className="border-white/10 bg-white/5 text-white dark:bg-white/5"
+              compact
+              displayedPrice={station.selectedFuelPrice}
+              eagerSummary
+              fuel={selectedFuel}
+              stationId={station.id}
+            />
           </div>
         </div>
 
