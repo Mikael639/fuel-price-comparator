@@ -36,9 +36,12 @@ export default defineConfig({
             urlPattern: ({ url }) =>
               url.pathname.startsWith("/api/fuel/") ||
               url.pathname.startsWith("/api/geocode/") ||
+              url.pathname.startsWith("/api/route") ||
+              url.pathname.startsWith("/api/osm/") ||
               url.pathname.startsWith("/api/europe/") ||
               url.hostname === "data.economie.gouv.fr" ||
               url.hostname === "nominatim.openstreetmap.org" ||
+              url.hostname === "router.project-osrm.org" ||
               url.hostname === "overpass-api.de",
             handler: "NetworkFirst",
             options: {
@@ -94,6 +97,16 @@ export default defineConfig({
         target: "https://nominatim.openstreetmap.org",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/geocode/, ""),
+      },
+      "/api/route": {
+        target: "https://router.project-osrm.org",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/route/, "/route/v1/driving"),
+      },
+      "/api/osm": {
+        target: "https://overpass-api.de",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/osm\/brand/, "/api/interpreter"),
       },
     },
   },

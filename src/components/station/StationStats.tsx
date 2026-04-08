@@ -10,6 +10,7 @@ interface StationStatsProps {
   maxNetSavings: number | null;
   freshestPriceUpdate: string | null;
   staleCount: number;
+  isRouteMode?: boolean;
 }
 
 export const StationStats = ({
@@ -20,6 +21,7 @@ export const StationStats = ({
   maxNetSavings,
   freshestPriceUpdate,
   staleCount,
+  isRouteMode = false,
 }: StationStatsProps) => {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
@@ -45,7 +47,7 @@ export const StationStats = ({
             <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/60">Prix moyen</p>
             <div className="font-display text-xl font-bold tracking-tight sm:text-2xl">{formatPrice(averagePrice)}</div>
             <p className="mt-1 text-[10px] font-medium text-muted-foreground">
-              {freshestPriceUpdate ? `Maj ${formatFreshness(freshestPriceUpdate)}` : "Sur zone courante"}
+              {freshestPriceUpdate ? `Maj ${formatFreshness(freshestPriceUpdate)}` : "Sur la selection courante"}
             </p>
           </div>
         </CardContent>
@@ -77,7 +79,7 @@ export const StationStats = ({
           </div>
           <div>
             <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-amber-600/60 dark:text-amber-400/60">
-              Gain itineraire
+              {isRouteMode ? "Gain trajet" : "Gain net"}
             </p>
             <div className="font-display text-xl font-bold tracking-tight text-amber-600 dark:text-amber-400 sm:text-2xl">
               {maxNetSavings != null ? `+${formatMoney(maxNetSavings)}` : "--"}

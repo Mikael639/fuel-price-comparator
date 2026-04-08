@@ -81,7 +81,11 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
 
           <div className="flex flex-wrap gap-3 text-xs font-bold uppercase tracking-widest text-white/50 sm:gap-4">
              <div className="flex items-center gap-2">
-               <span className="text-emerald-400 font-black">{formatDistance(station.distanceKm)}</span>
+               <span className="text-emerald-400 font-black">
+                 {station.isRouteDetour
+                   ? `${station.hasAccurateRouteDetour ? "Detour reel" : "Detour estime"} ${formatDistance(station.distanceKm)}`
+                   : formatDistance(station.distanceKm)}
+               </span>
                <span>-</span>
                <span>~{formatDriveTime(station.estimatedDriveMinutes)}</span>
              </div>
@@ -101,6 +105,7 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
                 Details
               </Button>
               <Button 
+                aria-label={station.isFavorite ? "Retirer des favorites" : "Ajouter aux favorites"}
                 onClick={() => toggleFavorite(station.id)} 
                 variant="ghost"
                 className="h-12 w-full rounded-xl p-0 text-white hover:bg-white/10 sm:w-12"
@@ -111,7 +116,7 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
             
             <div className="space-y-2">
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] px-1">Navigation GPS</p>
-              <NavigationMenu className="w-full" lat={station.lat} lng={station.lng} />
+              <NavigationMenu className="w-full" lat={station.lat} lng={station.lng} tone="inverse" />
             </div>
           </div>
         </div>

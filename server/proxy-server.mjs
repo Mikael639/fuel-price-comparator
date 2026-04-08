@@ -4,6 +4,7 @@ import XLSX from "xlsx";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
+const OSRM_URL = process.env.OSRM_URL ?? "https://router.project-osrm.org/route/v1/driving";
 const DGCCRF_RECORDS_URL =
   "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
 const DGCCRF_HISTORY_URL =
@@ -21,8 +22,12 @@ const EUROPE_COUNTRIES = {
 };
 
 const cache = new Map();
+const GEOCODING_SUCCESS_TTL_MS = 30 * 60 * 1000;
+const GEOCODING_RATE_LIMIT_TTL_MS = 2 * 60 * 1000;
+const ROUTE_SUCCESS_TTL_MS = 30 * 60 * 1000;
 const OSM_BRAND_FAILURE_TTL_MS = 10 * 60 * 1000;
 const OSM_BRAND_RATE_LIMIT_TTL_MS = 15 * 60 * 1000;
+let geocodingRateLimitedUntil = 0;
 let osmRateLimitedUntil = 0;
 
 const setCorsHeaders = (response) => {
@@ -84,15 +89,67 @@ const readRequestBody = (request) =>
     request.on("error", reject);
   });
 
+const sanitizeUpstreamErrorMessage = (payload, status) => {
+  const normalized = payload
+    ?.replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return `Proxy upstream error (${status})`;
+  }
+
+  return normalized.slice(0, 220);
+};
+
 const proxyJsonRequest = async (targetUrl, init = {}) => {
   const response = await fetch(targetUrl, init);
   const payload = await response.text();
 
   if (!response.ok) {
-    throw new ProxyHttpError(response.status, payload || `Proxy upstream error (${response.status})`);
+    throw new ProxyHttpError(response.status, sanitizeUpstreamErrorMessage(payload, response.status));
   }
 
   return JSON.parse(payload);
+};
+
+const proxyGeocodingSearch = async (searchParams) => {
+  const queryUrl = new URL(NOMINATIM_URL);
+
+  queryUrl.search = searchParams;
+
+  if (!queryUrl.searchParams.has("format")) {
+    queryUrl.searchParams.set("format", "jsonv2");
+  }
+
+  const cacheKey = `geocode:${queryUrl.searchParams.toString()}`;
+  const cachedPayload = getCachedValue(cacheKey);
+
+  if (cachedPayload) {
+    return cachedPayload;
+  }
+
+  if (geocodingRateLimitedUntil > Date.now()) {
+    throw new ProxyHttpError(429, "Le geocodeur public est temporairement limite. Reessayez dans quelques instants.");
+  }
+
+  try {
+    const payload = await proxyJsonRequest(queryUrl.toString(), {
+      headers: {
+        "User-Agent": "FuelFlashProxy/1.0",
+      },
+    });
+
+    setCachedValue(cacheKey, payload, GEOCODING_SUCCESS_TTL_MS);
+    return payload;
+  } catch (error) {
+    if (error instanceof ProxyHttpError && error.status === 429) {
+      geocodingRateLimitedUntil = Math.max(geocodingRateLimitedUntil, Date.now() + GEOCODING_RATE_LIMIT_TTL_MS);
+      throw new ProxyHttpError(429, "Le geocodeur public est temporairement limite. Reessayez dans quelques instants.");
+    }
+
+    throw new ProxyHttpError(503, "Le geocodage est temporairement indisponible.");
+  }
 };
 
 const proxyOsmBrandLookup = async (query) => {
@@ -141,6 +198,38 @@ const proxyOsmBrandLookup = async (query) => {
     setCachedValue(cacheKey, fallbackPayload, OSM_BRAND_FAILURE_TTL_MS);
     return fallbackPayload;
   }
+};
+
+const proxyRouteRequest = async (searchParams) => {
+  const origin = searchParams.get("origin");
+  const destination = searchParams.get("destination");
+  const coordinates = searchParams.get("coordinates");
+
+  if (!coordinates && (!origin || !destination)) {
+    throw new ProxyHttpError(400, "Missing route coordinates");
+  }
+
+  const routeCoordinates = coordinates ?? `${origin};${destination}`;
+  const routeUrl = new URL(`${OSRM_URL.replace(/\/+$/, "")}/${routeCoordinates}`);
+  routeUrl.searchParams.set("overview", searchParams.get("overview") ?? "full");
+  routeUrl.searchParams.set("geometries", searchParams.get("geometries") ?? "geojson");
+  routeUrl.searchParams.set("steps", searchParams.get("steps") ?? "false");
+
+  const cacheKey = `route:${routeUrl.toString()}`;
+  const cachedPayload = getCachedValue(cacheKey);
+
+  if (cachedPayload) {
+    return cachedPayload;
+  }
+
+  const payload = await proxyJsonRequest(routeUrl.toString(), {
+    headers: {
+      "User-Agent": "FuelFlashProxy/1.0",
+    },
+  });
+
+  setCachedValue(cacheKey, payload, ROUTE_SUCCESS_TTL_MS);
+  return payload;
 };
 
 const excelDateToIso = (value) => {
@@ -261,19 +350,13 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/geocode/search") {
-      const queryUrl = new URL(NOMINATIM_URL);
+      const payload = await proxyGeocodingSearch(url.searchParams.toString());
+      sendJson(response, 200, payload);
+      return;
+    }
 
-      queryUrl.search = url.searchParams.toString();
-
-      if (!queryUrl.searchParams.has("format")) {
-        queryUrl.searchParams.set("format", "jsonv2");
-      }
-
-      const payload = await proxyJsonRequest(queryUrl.toString(), {
-        headers: {
-          "User-Agent": "FuelFlashProxy/1.0",
-        },
-      });
+    if (url.pathname === "/api/route") {
+      const payload = await proxyRouteRequest(url.searchParams);
       sendJson(response, 200, payload);
       return;
     }
@@ -288,6 +371,13 @@ const server = http.createServer(async (request, response) => {
 
     sendJson(response, 404, { error: "Not found" });
   } catch (error) {
+    if (error instanceof ProxyHttpError) {
+      sendJson(response, error.status, {
+        error: error.message,
+      });
+      return;
+    }
+
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Unknown proxy error",
     });

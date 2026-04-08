@@ -4,6 +4,7 @@ import {
   mapRecordToStation,
   mergeStationHistory,
   normalizeOfficialText,
+  stationService,
   sortStations,
 } from "@/services/stationService";
 import type { FuelStation, StationWithMetrics } from "@/types/station";
@@ -42,6 +43,7 @@ const baseStation: FuelStation = {
 const createMetricsStation = (overrides?: Partial<StationWithMetrics>): StationWithMetrics => ({
   ...baseStation,
   distanceKm: 4,
+  distanceToRouteKm: null,
   selectedFuelPrice: 1.7,
   estimatedDriveMinutes: 9,
   savingsPerLiter: 0.07,
@@ -52,6 +54,7 @@ const createMetricsStation = (overrides?: Partial<StationWithMetrics>): StationW
   isFavorite: false,
   priceTrend: "stable",
   isRouteDetour: false,
+  hasAccurateRouteDetour: false,
   ...overrides,
 });
 
@@ -130,5 +133,96 @@ describe("stationService helpers", () => {
     ];
 
     expect(sortStations(stations, "savings")[0]?.id).toBe("3");
+  });
+
+  it("filters stations using the active route corridor", () => {
+    const routePath = {
+      origin: { lat: 48.8566, lng: 2.3522, label: "Paris" },
+      destination: { lat: 48.8866, lng: 2.4322, label: "Noisy-le-Sec" },
+      geometry: [
+        { lat: 48.8566, lng: 2.3522 },
+        { lat: 48.8666, lng: 2.3922 },
+        { lat: 48.8866, lng: 2.4322 },
+      ],
+      distanceKm: 7.8,
+      durationMinutes: 18,
+    } as const;
+
+    const stations = stationService.findNearbyStations({
+      stations: [
+        {
+          ...baseStation,
+          id: "on-route",
+          lat: 48.867,
+          lng: 2.393,
+          fuelPrices: { Diesel: 1.68, SP95: 1.79 },
+        },
+        {
+          ...baseStation,
+          id: "far-away",
+          lat: 48.93,
+          lng: 2.61,
+          fuelPrices: { Diesel: 1.66, SP95: 1.77 },
+        },
+      ],
+      position: routePath.origin,
+      radiusKm: 3,
+      openOnly: false,
+      services: [],
+      fuel: "Diesel",
+      sortMode: "price",
+      favoriteIds: [],
+      fillVolumeLiters: 50,
+      consumptionLitersPer100Km: 6.5,
+      routePath,
+      routePosition: routePath.destination,
+    });
+
+    expect(stations).toHaveLength(1);
+    expect(stations[0]?.id).toBe("on-route");
+    expect(stations[0]?.isRouteDetour).toBe(true);
+    expect(stations[0]?.distanceToRouteKm).not.toBeNull();
+  });
+
+  it("prefers a precise route detour when it is available", () => {
+    const routePath = {
+      origin: { lat: 48.6899, lng: 2.3734, label: "Juvisy" },
+      destination: { lat: 48.7075, lng: 2.3928, label: "Athis-Mons" },
+      geometry: [
+        { lat: 48.6899, lng: 2.3734 },
+        { lat: 48.6998, lng: 2.3856 },
+        { lat: 48.7075, lng: 2.3928 },
+      ],
+      distanceKm: 6.2,
+      durationMinutes: 13,
+    } as const;
+
+    const stationWithPreciseDetour = stationService.findNearbyStations({
+      stations: [
+        {
+          ...baseStation,
+          id: "detour-station",
+          lat: 48.6998,
+          lng: 2.3856,
+          routeDetourKm: 1.4,
+          routeDetourMinutes: 5,
+        },
+      ],
+      position: routePath.origin,
+      radiusKm: 3,
+      openOnly: false,
+      services: [],
+      fuel: "Diesel",
+      sortMode: "distance",
+      favoriteIds: [],
+      fillVolumeLiters: 50,
+      consumptionLitersPer100Km: 6.5,
+      routePath,
+      routePosition: routePath.destination,
+    });
+
+    expect(stationWithPreciseDetour[0]?.distanceKm).toBeCloseTo(1.4, 3);
+    expect(stationWithPreciseDetour[0]?.estimatedDriveMinutes).toBe(5);
+    expect(stationWithPreciseDetour[0]?.hasAccurateRouteDetour).toBe(true);
   });
 });

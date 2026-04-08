@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Expand, LocateFixed, Navigation, Star } from "lucide-react";
+import { Expand, LocateFixed, Star } from "lucide-react";
 import L from "leaflet";
 import "leaflet.markercluster";
-import { Circle, MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { NavigationMenu } from "@/components/station/NavigationMenu";
 import { formatDistance, formatDriveTime, formatPrice } from "@/utils/format";
-import { getGoogleMapsDirectionsUrl } from "@/utils/navigation";
 import { useFuelStationsStore } from "@/store/useFuelStationsStore";
 import { cn } from "@/lib/utils";
-import type { Coordinates, FuelType, StationWithMetrics } from "@/types/station";
+import type { Coordinates, FuelType, RoutePath, StationWithMetrics } from "@/types/station";
 
 const userIcon = L.divIcon({
   className: "map-user-marker",
   html: '<div class="h-6 w-6 rounded-full border-4 border-teal-300 bg-slate-900 shadow-lg"></div>',
   iconSize: [24, 24],
   iconAnchor: [12, 12],
+});
+
+const destinationIcon = L.divIcon({
+  className: "map-destination-marker",
+  html: '<div class="flex h-7 w-7 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-[11px] font-black text-white shadow-lg">A</div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
 });
 
 const createStationIcon = (best: boolean, open: boolean, showPrice: boolean, price?: string) =>
@@ -66,12 +73,16 @@ const ClusteredStationsLayer = ({
 
     stations.forEach((station, index) => {
       const marker = L.marker([station.lat, station.lng], {
+        alt: station.name,
         icon: createStationIcon(
           station.id === bestStationId,
           station.isOpen,
           station.id === bestStationId || index < 2,
           station.selectedFuelPrice != null ? formatPrice(station.selectedFuelPrice) : undefined,
         ),
+        keyboard: true,
+        riseOnHover: true,
+        title: station.name,
       });
 
       marker.bindPopup(`
@@ -79,11 +90,12 @@ const ClusteredStationsLayer = ({
           <h4 class="map-popup__title">${station.name}</h4>
           <p class="map-popup__meta">${station.address}, ${station.city}</p>
           <p class="map-popup__meta">${selectedFuel} - ${formatPrice(station.selectedFuelPrice)}</p>
-          <p class="map-popup__meta">${formatDistance(station.distanceKm)} - ~ ${formatDriveTime(station.estimatedDriveMinutes)}</p>
-          <div class="map-popup__actions">
-            <a class="map-popup__button" href="/station/${station.id}">Voir details</a>
-            <a class="map-popup__button map-popup__button--ghost" href="${getGoogleMapsDirectionsUrl(station.lat, station.lng)}" target="_blank" rel="noopener noreferrer">Y aller</a>
-          </div>
+          <p class="map-popup__meta">${
+            station.isRouteDetour
+              ? `${station.hasAccurateRouteDetour ? "Detour reel" : "Detour estime"} ${formatDistance(station.distanceKm)}`
+              : formatDistance(station.distanceKm)
+          } - ~ ${formatDriveTime(station.estimatedDriveMinutes)}</p>
+          <p class="map-popup__meta">Selectionnez le marqueur pour ouvrir les actions.</p>
         </div>
       `);
 
@@ -122,6 +134,7 @@ interface StationsMapProps {
   stations: StationWithMetrics[];
   selectedFuel: FuelType;
   radiusKm: number;
+  routePath?: RoutePath | null;
   bestStationId?: string | null;
 }
 
@@ -130,6 +143,7 @@ export const StationsMap = ({
   stations,
   selectedFuel,
   radiusKm,
+  routePath = null,
   bestStationId = null,
 }: StationsMapProps) => {
   const navigate = useNavigate();
@@ -155,19 +169,25 @@ export const StationsMap = ({
   );
 
   const bounds = useMemo(() => {
-    if (!userPosition && stations.length === 0) {
+    if (!userPosition && stations.length === 0 && !routePath) {
       return null;
     }
 
     const latLngs: L.LatLngTuple[] = stations.map((station) => [station.lat, station.lng]);
+    if (routePath) {
+      latLngs.push(...routePath.geometry.map((point) => [point.lat, point.lng] as L.LatLngTuple));
+      latLngs.push([routePath.destination.lat, routePath.destination.lng]);
+    }
     if (userPosition) {
       latLngs.push([userPosition.lat, userPosition.lng]);
-      const searchBounds = L.latLng([userPosition.lat, userPosition.lng]).toBounds(radiusKm * 1000);
-      latLngs.push([searchBounds.getNorthEast().lat, searchBounds.getNorthEast().lng]);
-      latLngs.push([searchBounds.getSouthWest().lat, searchBounds.getSouthWest().lng]);
+      if (!routePath) {
+        const searchBounds = L.latLng([userPosition.lat, userPosition.lng]).toBounds(radiusKm * 1000);
+        latLngs.push([searchBounds.getNorthEast().lat, searchBounds.getNorthEast().lng]);
+        latLngs.push([searchBounds.getSouthWest().lat, searchBounds.getSouthWest().lng]);
+      }
     }
     return L.latLngBounds(latLngs);
-  }, [radiusKm, stations, userPosition]);
+  }, [radiusKm, routePath, stations, userPosition]);
 
   useEffect(() => {
     if (!selectedStation && bestStationId) {
@@ -210,12 +230,16 @@ export const StationsMap = ({
           <div className="space-y-3">
             <div>
               <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-primary">Carte interactive</p>
-              <h3 className="font-display text-xl tracking-tight">Stations visibles autour de vous</h3>
+              <h3 className="font-display text-xl tracking-tight">
+                {routePath ? "Stations visibles sur votre trajet" : "Stations visibles autour de vous"}
+              </h3>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge>{selectedFuel}</Badge>
               <Badge variant="secondary">{stations.length} stations</Badge>
-              <Badge variant="accent">Rayon {radiusKm} km</Badge>
+              <Badge variant="accent">{routePath ? `Corridor ${radiusKm} km` : `Rayon ${radiusKm} km`}</Badge>
+              {routePath ? <Badge variant="secondary">{formatDistance(routePath.distanceKm)}</Badge> : null}
+              {routePath ? <Badge variant="secondary">~ {formatDriveTime(routePath.durationMinutes)}</Badge> : null}
             </div>
           </div>
 
@@ -239,11 +263,17 @@ export const StationsMap = ({
           <div className="pointer-events-none absolute left-3 right-3 top-3 z-[500] flex flex-wrap gap-1.5 rounded-2xl border border-white/50 bg-white/80 px-3 py-2 text-[11px] font-semibold shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-950/70 md:left-8 md:right-auto md:top-4 md:max-w-[calc(100%-4rem)] md:gap-2 md:rounded-full md:text-xs">
             <span>Votre position</span>
             <span>•</span>
-            <span>Zone de recherche</span>
+            <span>{routePath ? "Trace du trajet" : "Zone de recherche"}</span>
             {bestStationId ? (
               <>
                 <span>•</span>
                 <span>Meilleur prix recommande</span>
+              </>
+            ) : null}
+            {selectedStation ? (
+              <>
+                <span>•</span>
+                <span>Panneau d'action actif</span>
               </>
             ) : null}
           </div>
@@ -261,9 +291,20 @@ export const StationsMap = ({
               {bounds ? <FitBounds bounds={bounds} /> : null}
               {userPosition ? (
                 <>
-                  <Circle center={[userPosition.lat, userPosition.lng]} pathOptions={{ color: "#0f766e", dashArray: "8 8" }} radius={radiusKm * 1000} />
+                  {!routePath ? (
+                    <Circle center={[userPosition.lat, userPosition.lng]} pathOptions={{ color: "#0f766e", dashArray: "8 8" }} radius={radiusKm * 1000} />
+                  ) : null}
                   <Circle center={[userPosition.lat, userPosition.lng]} pathOptions={{ color: "#0f766e", fillColor: "#5eead4", fillOpacity: 0.2 }} radius={260} />
                   <Marker icon={userIcon} position={[userPosition.lat, userPosition.lng]} />
+                </>
+              ) : null}
+              {routePath ? (
+                <>
+                  <Polyline
+                    pathOptions={{ color: "#0f766e", opacity: 0.9, weight: 5 }}
+                    positions={routePath.geometry.map((point) => [point.lat, point.lng] as L.LatLngTuple)}
+                  />
+                  <Marker icon={destinationIcon} position={[routePath.destination.lat, routePath.destination.lng]} />
                 </>
               ) : null}
               <ClusteredStationsLayer
@@ -276,7 +317,11 @@ export const StationsMap = ({
           </div>
 
           {selectedStation ? (
-            <div className="absolute inset-x-3 bottom-3 z-[500] rounded-[22px] border border-white/40 bg-white/90 p-3.5 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-4 md:left-auto md:w-[26rem] md:rounded-[24px] md:p-4 dark:border-white/10 dark:bg-slate-950/85">
+            <div
+              aria-live="polite"
+              className="absolute inset-x-3 bottom-3 z-[500] rounded-[22px] border border-white/40 bg-white/90 p-3.5 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-4 md:left-auto md:w-[26rem] md:rounded-[24px] md:p-4 dark:border-white/10 dark:bg-slate-950/85"
+              role="status"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{selectedStation.brand}</p>
@@ -285,14 +330,26 @@ export const StationsMap = ({
                     {selectedStation.address}, {selectedStation.city}
                   </p>
                 </div>
-                <button onClick={() => toggleFavorite(selectedStation.id)} type="button">
+                <button
+                  aria-label={selectedStation.isFavorite ? "Retirer des favorites" : "Ajouter aux favorites"}
+                  onClick={() => toggleFavorite(selectedStation.id)}
+                  type="button"
+                >
                   <Star className={`h-5 w-5 ${selectedStation.isFavorite ? "fill-current text-amber-500" : "text-muted-foreground"}`} />
                 </button>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge>{selectedFuel} • {formatPrice(selectedStation.selectedFuelPrice)}</Badge>
-                <Badge variant="secondary">{formatDistance(selectedStation.distanceKm)}</Badge>
+                <Badge variant="secondary">
+                  {selectedStation.isRouteDetour
+                    ? `${selectedStation.hasAccurateRouteDetour ? "Detour reel" : "Detour estime"} ${formatDistance(selectedStation.distanceKm)}`
+                    : formatDistance(selectedStation.distanceKm)}
+                </Badge>
+                {selectedStation.distanceToRouteKm != null ? (
+                  <Badge variant="secondary">a {formatDistance(selectedStation.distanceToRouteKm)} du trajet</Badge>
+                ) : null}
+                {selectedStation.hasAccurateRouteDetour ? <Badge variant="accent">Detour affine</Badge> : null}
                 <Badge variant="secondary">~ {formatDriveTime(selectedStation.estimatedDriveMinutes)}</Badge>
               </div>
 
@@ -300,12 +357,11 @@ export const StationsMap = ({
                 <Button className="w-full sm:flex-1" onClick={() => navigate(`/station/${selectedStation.id}`)} variant="tonal">
                   Voir details
                 </Button>
-                <Button asChild className="w-full sm:flex-1">
-                  <a href={getGoogleMapsDirectionsUrl(selectedStation.lat, selectedStation.lng)} rel="noreferrer" target="_blank">
-                    <Navigation className="h-4 w-4" />
-                    Y aller
-                  </a>
-                </Button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Navigation GPS</p>
+                <NavigationMenu className="w-full" lat={selectedStation.lat} lng={selectedStation.lng} />
               </div>
             </div>
           ) : null}

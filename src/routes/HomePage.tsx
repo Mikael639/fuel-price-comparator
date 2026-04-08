@@ -30,6 +30,7 @@ export const HomePage = () => {
   const locationSource = useFuelStationsStore((state) => state.locationSource);
   const isLoading = useFuelStationsStore((state) => state.isLoading);
   const isHydratingHistory = useFuelStationsStore((state) => state.isHydratingHistory);
+  const isHydratingRouteDetours = useFuelStationsStore((state) => state.isHydratingRouteDetours);
   const isGeolocating = useFuelStationsStore((state) => state.isGeolocating);
   const isSearchingLocation = useFuelStationsStore((state) => state.isSearchingLocation);
   const geoError = useFuelStationsStore((state) => state.geoError);
@@ -47,6 +48,9 @@ export const HomePage = () => {
   const geocodingResults = useFuelStationsStore((state) => state.geocodingResults);
   const routeDestination = useFuelStationsStore((state) => state.routeDestination);
   const isSearchingRoute = useFuelStationsStore((state) => state.isSearchingRoute);
+  const isLoadingRoute = useFuelStationsStore((state) => state.isLoadingRoute);
+  const routeError = useFuelStationsStore((state) => state.routeError);
+  const routePath = useFuelStationsStore((state) => state.routePath);
   const routeResults = useFuelStationsStore((state) => state.routeResults);
   const requestUserLocation = useFuelStationsStore((state) => state.requestUserLocation);
   const refreshPosition = useFuelStationsStore((state) => state.refreshPosition);
@@ -75,6 +79,7 @@ export const HomePage = () => {
     isDataUnavailable,
   } = useFuelStationsViewModel();
   const hasActiveZone = Boolean(userPosition);
+  const isRouteMode = Boolean(routePath);
 
   const [mapMessage, setMapMessage] = useState<string | null>(null);
   const previousLocationRef = useRef<string | null>(null);
@@ -104,11 +109,15 @@ export const HomePage = () => {
       ? `Jusqu'à ${stats.maxNetSavings.toFixed(2).replace(".", ",")} EUR nets sur ${fillVolumeLiters}L.`
       : stats.maxSavings != null && bestStation
         ? `Jusqu'à ${stats.maxSavings.toFixed(2).replace(".", ",")} EUR d'économie par litre sur ${selectedFuel}.`
-        : "Affinez vos filtres pour faire ressortir l'offre la plus intéressante autour de vous.";
+        : isRouteMode
+          ? "Affinez vos filtres pour faire ressortir l'offre la plus intéressante sur votre trajet."
+          : "Affinez vos filtres pour faire ressortir l'offre la plus intéressante autour de vous.";
 
   const distanceFocusHint =
     bestStation && absoluteCheapestStation && bestStation.id !== absoluteCheapestStation.id
-      ? `Le tarif absolu le plus bas du rayon est à ${absoluteCheapestStation.distanceKm.toFixed(1).replace(".", ",")} km. La recommandation privilégie une station plus proche pour rester pertinente localement.`
+      ? isRouteMode
+        ? `Le tarif absolu le plus bas du trajet demande un détour estimé de ${absoluteCheapestStation.distanceKm.toFixed(1).replace(".", ",")} km. La recommandation privilégie une station plus fluide sur l'itinéraire.`
+        : `Le tarif absolu le plus bas du rayon est à ${absoluteCheapestStation.distanceKm.toFixed(1).replace(".", ",")} km. La recommandation privilégie une station plus proche pour rester pertinente localement.`
       : null;
 
   const infoBannerMessages = useMemo(
@@ -119,8 +128,23 @@ export const HomePage = () => {
         variant: "error" as const,
       },
       {
+        key: "route-active",
+        message: routePath
+          ? `Mode trajet actif vers ${routePath.destination.label ?? routeDestination}. Le tri privilegie maintenant les stations situees sur le corridor reel.`
+          : null,
+        variant: "success" as const,
+      },
+      {
         key: "hydrating-history",
         message: isHydratingHistory ? "Historique officiel en cours de chargement pour affiner les tendances locales." : null,
+        variant: "info" as const,
+      },
+      {
+        key: "hydrating-route-detours",
+        message:
+          isHydratingRouteDetours && routePath
+            ? "Les detours reels sont en cours d'affinage sur les stations les plus prometteuses du trajet."
+            : null,
         variant: "info" as const,
       },
       {
@@ -140,7 +164,10 @@ export const HomePage = () => {
       },
       {
         key: "favorites-summary",
-        message: favoriteStations.length > 0 ? `${favoriteStations.length} station(s) favorite(s) dans le rayon courant.` : null,
+        message:
+          favoriteStations.length > 0
+            ? `${favoriteStations.length} station(s) favorite(s) ${isRouteMode ? "sur le trajet courant" : "dans le rayon courant"}.`
+            : null,
         variant: "success" as const,
       },
       {
@@ -157,7 +184,11 @@ export const HomePage = () => {
       genericError,
       isDataUnavailable,
       isHydratingHistory,
+      isHydratingRouteDetours,
+      isRouteMode,
       locationSource,
+      routeDestination,
+      routePath,
       selectedFuel,
       stats.freshestPriceUpdate,
       stats.staleCount,
@@ -189,8 +220,12 @@ export const HomePage = () => {
 
               <SectionHeading
                 eyebrow="Recherche locale"
-                subtitle="Comparez les prix live autour de vous, sur votre trajet, et laissez le mode plein malin privilégier le vrai gain net."
-                title="Trouvez vite la meilleure station autour de vous"
+                subtitle={
+                  isRouteMode
+                    ? "Comparez les prix live le long de votre trajet et laissez le mode plein malin privilégier le vrai gain net."
+                    : "Comparez les prix live autour de vous, sur votre trajet, et laissez le mode plein malin privilégier le vrai gain net."
+                }
+                title={isRouteMode ? "Trouvez vite la meilleure station sur votre trajet" : "Trouvez vite la meilleure station autour de vous"}
               />
 
               <p className="max-w-2xl text-sm leading-7 text-slate-500 dark:text-slate-400">
@@ -218,7 +253,7 @@ export const HomePage = () => {
               <div className="space-y-4">
                 <div>
                   <div className="font-display text-4xl">{nearbyStations.length}</div>
-                  <div className="text-sm text-white/65">stations dans le rayon</div>
+                  <div className="text-sm text-white/65">{isRouteMode ? "stations sur le trajet" : "stations dans le rayon"}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -234,7 +269,7 @@ export const HomePage = () => {
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100/70">Lecture dominante</div>
                   <div className="mt-2 text-sm leading-6 text-teal-50">
                     {bestStation
-                      ? `${bestStation.name} ressort comme option clé sur ${selectedFuel}.`
+                      ? `${bestStation.name} ressort comme option clé ${isRouteMode ? "sur votre trajet." : `sur ${selectedFuel}.`}`
                       : "Choisissez une zone pour faire émerger une recommandation locale nette."}
                   </div>
                 </div>
@@ -250,17 +285,20 @@ export const HomePage = () => {
           geocodingError={geocodingError}
           isGeolocating={isGeolocating}
           isSearchingLocation={isSearchingLocation}
+          isLoadingRoute={isLoadingRoute}
           isSearchingRoute={isSearchingRoute}
           locationLabel={locationLabel}
           locationSource={locationSource}
           onLocate={() => void requestUserLocation()}
           onRefresh={() => void refreshPosition()}
-          onSearchAddress={(query) => void searchLocations(query)}
-          onSearchRoute={(query) => void searchRoute(query)}
+          onSearchAddress={(query, options) => void searchLocations(query, options)}
+          onSearchRoute={(query, options) => void searchRoute(query, options)}
           onSelectRouteResult={(result) => void selectRouteLocation(result)}
           onSelectSearchResult={selectSearchLocation}
           onClearRoute={clearRoute}
           routeDestination={routeDestination}
+          routeError={routeError}
+          routePath={routePath}
           routeResults={routeResults}
           searchQuery={searchQuery}
           searchResults={geocodingResults}
@@ -311,6 +349,7 @@ export const HomePage = () => {
                 averagePrice={stats.averagePrice}
                 comparableCount={stats.comparableCount}
                 freshestPriceUpdate={stats.freshestPriceUpdate}
+                isRouteMode={isRouteMode}
                 maxNetSavings={stats.maxNetSavings}
                 maxSavings={stats.maxSavings}
                 staleCount={stats.staleCount}
@@ -337,7 +376,11 @@ export const HomePage = () => {
               <div className="mb-4">
                 <SectionHeading
                   eyebrow="Favoris"
-                  subtitle="Retrouvez rapidement vos stations enregistrées dans la zone visible."
+                  subtitle={
+                    isRouteMode
+                      ? "Retrouvez rapidement vos stations enregistrées sur le trajet courant."
+                      : "Retrouvez rapidement vos stations enregistrées dans la zone visible."
+                  }
                   title="Vos stations favorites"
                 />
               </div>
@@ -361,6 +404,7 @@ export const HomePage = () => {
               <StationsMap
                 bestStationId={bestStation?.id ?? null}
                 radiusKm={radiusKm}
+                routePath={routePath}
                 selectedFuel={selectedFuel}
                 stations={nearbyStations}
                 userPosition={userPosition}
@@ -371,9 +415,13 @@ export const HomePage = () => {
           {userPosition && !hasResults ? (
             <section className="mb-6 md:mb-8">
               <EmptyStateCard
-                description="Aucune station n'apparaît avec le rayon et les filtres actuels. Élargissez le rayon ou retirez quelques services."
+                description={
+                  isRouteMode
+                    ? "Aucune station n'apparaît sur le trajet avec les filtres actuels. Élargissez le corridor ou retirez quelques services."
+                    : "Aucune station n'apparaît avec le rayon et les filtres actuels. Élargissez le rayon ou retirez quelques services."
+                }
                 icon={MapPinOff}
-                title="Aucun résultat dans le rayon"
+                title={isRouteMode ? "Aucun résultat sur le trajet" : "Aucun résultat dans le rayon"}
               />
             </section>
           ) : null}
@@ -393,7 +441,7 @@ export const HomePage = () => {
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <SectionHeading
                   eyebrow="Classement"
-                  subtitle={`Les stations sont triées par ${sortModeCopy[sortMode].toLowerCase()} dans le rayon courant.`}
+                  subtitle={`Les stations sont triées par ${sortModeCopy[sortMode].toLowerCase()} ${isRouteMode ? "sur le trajet courant" : "dans le rayon courant"}.`}
                   title="Liste des stations"
                 />
                 <Badge variant="secondary">{savingsHero}</Badge>

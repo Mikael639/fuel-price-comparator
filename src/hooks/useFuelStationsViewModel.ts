@@ -14,6 +14,7 @@ export const useFuelStationsViewModel = () => {
   const fillVolumeLiters = useFuelStationsStore((state) => state.fillVolumeLiters);
   const consumptionLitersPer100Km = useFuelStationsStore((state) => state.consumptionLitersPer100Km);
   const routePosition = useFuelStationsStore((state) => state.routePosition);
+  const routePath = useFuelStationsStore((state) => state.routePath);
   const favoriteAlertPrice = useFuelStationsStore((state) => state.favoriteAlertPrice);
 
   const nearbyStations = useMemo(() => {
@@ -32,6 +33,7 @@ export const useFuelStationsViewModel = () => {
       favoriteIds,
       fillVolumeLiters,
       consumptionLitersPer100Km,
+      routePath,
       routePosition,
     });
   }, [
@@ -41,6 +43,7 @@ export const useFuelStationsViewModel = () => {
     fillVolumeLiters,
     openOnly,
     radiusKm,
+    routePath,
     routePosition,
     selectedFuel,
     selectedServices,
