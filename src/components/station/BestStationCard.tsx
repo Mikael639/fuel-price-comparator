@@ -162,7 +162,10 @@ export const BestStationCard = ({ station, selectedFuel, averagePrice }: BestSta
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">Gain net estime</p>
-                  <p className="text-xl font-display font-bold text-amber-400">+{formatMoney(netSavings)}</p>
+                  <p className="text-xl font-display font-bold text-amber-400">
+                    +{formatMoney(netSavings)}
+                    <span className="ml-2 text-xs font-semibold uppercase tracking-widest text-white/45">sur {fillVolume}L</span>
+                  </p>
                 </div>
               </div>
             )}

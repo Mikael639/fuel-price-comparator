@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import { appConfig } from "@/config/app";
 import type { FuelStationsState, PreferencesSlice } from "@/store/fuelStationsStore.types";
+import { normalizeFillVolumeLiters } from "@/store/fuelStationsStore.utils";
 
 export const createPreferencesSlice: StateCreator<
   FuelStationsState,
@@ -17,7 +18,7 @@ export const createPreferencesSlice: StateCreator<
   themeName: "fuelLight",
   favoriteIds: [],
   consumptionLitersPer100Km: appConfig.stations.defaultConsumptionLitersPer100Km,
-  fillVolumeLiters: appConfig.stations.defaultTankVolumeLiters,
+  fillVolumeLiters: normalizeFillVolumeLiters(appConfig.stations.defaultTankVolumeLiters),
   favoriteAlertPrice: appConfig.stations.defaultFavoriteAlertPrice,
   toggleFavorite: (stationId) =>
     set((state) => ({
@@ -35,7 +36,7 @@ export const createPreferencesSlice: StateCreator<
   setSelectedServices: (value) => set({ selectedServices: value }),
   setSortMode: (value) => set({ sortMode: value }),
   setConsumptionLitersPer100Km: (value) => set({ consumptionLitersPer100Km: value }),
-  setFillVolumeLiters: (value) => set({ fillVolumeLiters: value }),
+  setFillVolumeLiters: (value) => set({ fillVolumeLiters: normalizeFillVolumeLiters(value) }),
   setFavoriteAlertPrice: (value) => set({ favoriteAlertPrice: value }),
   setHasHydrated: (value) => set({ hasHydrated: value }),
 });

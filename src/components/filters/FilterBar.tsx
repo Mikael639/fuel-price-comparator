@@ -4,6 +4,12 @@ import { Select } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import {
+  MAX_FILL_VOLUME_LITERS,
+  MIN_FILL_VOLUME_LITERS,
+  SMART_FILL_VOLUME_PRESETS,
+  normalizeFillVolumeLiters,
+} from "@/store/fuelStationsStore.utils";
 import type { FuelType, ServiceType, SortMode } from "@/types/station";
 import { sortModeCopy } from "@/utils/format";
 
@@ -111,14 +117,77 @@ export const FilterBar = ({
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80">Volume du plein</p>
-            <Input
-              min={5}
-              onChange={(event) => onFillVolumeLitersChange(Math.max(5, Number(event.target.value) || 0))}
-              type="number"
-              value={fillVolumeLiters}
+          <div
+            className={cn(
+              "space-y-4 rounded-2xl border p-4 transition-colors",
+              sortMode === "smartFill"
+                ? "border-amber-300 bg-amber-50/80 shadow-sm shadow-amber-500/10 dark:border-amber-500/30 dark:bg-amber-500/10"
+                : "border-border bg-card/40",
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80">Plein malin</p>
+                <p className="text-sm font-semibold text-foreground">Volume de votre plein</p>
+              </div>
+              <div className="rounded-full bg-background px-3 py-1 text-sm font-black text-primary shadow-sm">
+                {fillVolumeLiters} L
+              </div>
+            </div>
+
+            <p className="text-xs leading-5 text-muted-foreground">
+              Le gain net est calcule avec ce volume. Chacun peut l'ajuster selon la taille de son reservoir.
+            </p>
+
+            <Slider
+              aria-label="Volume du plein"
+              className="py-2"
+              max={MAX_FILL_VOLUME_LITERS}
+              min={MIN_FILL_VOLUME_LITERS}
+              onValueChange={([value]) => onFillVolumeLitersChange(value)}
+              step={1}
+              value={[fillVolumeLiters]}
             />
+
+            <div className="flex flex-wrap gap-2">
+              {SMART_FILL_VOLUME_PRESETS.map((presetVolume) => {
+                const active = fillVolumeLiters === presetVolume;
+                return (
+                  <button
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-primary",
+                    )}
+                    key={presetVolume}
+                    onClick={() => onFillVolumeLitersChange(presetVolume)}
+                    type="button"
+                  >
+                    {presetVolume} L
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80">Saisie manuelle</p>
+              <div className="relative">
+                <Input
+                  aria-label="Volume du plein en litres"
+                  className="pr-12"
+                  max={MAX_FILL_VOLUME_LITERS}
+                  min={MIN_FILL_VOLUME_LITERS}
+                  onChange={(event) => onFillVolumeLitersChange(normalizeFillVolumeLiters(Number(event.target.value), fillVolumeLiters))}
+                  step="1"
+                  type="number"
+                  value={fillVolumeLiters}
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  L
+                </span>
+              </div>
+            </div>
           </div>
           <div className="space-y-2">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-primary/80">Consommation</p>

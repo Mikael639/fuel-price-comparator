@@ -8,7 +8,7 @@ import type {
   FuelStationsState,
   PersistedState,
 } from "@/store/fuelStationsStore.types";
-import { persistLocation } from "@/store/fuelStationsStore.utils";
+import { normalizeFillVolumeLiters, persistLocation } from "@/store/fuelStationsStore.utils";
 
 type LegacyPersistedState = Omit<Partial<PersistedState>, "locationSource"> & {
   locationSource?: string | null;
@@ -111,7 +111,12 @@ export const useFuelStationsStore = create<FuelStationsState>()(
             persistedValue.consumptionLitersPer100Km ??
             currentState.consumptionLitersPer100Km,
           fillVolumeLiters:
-            persistedValue.fillVolumeLiters ?? currentState.fillVolumeLiters,
+            persistedValue.fillVolumeLiters != null
+              ? normalizeFillVolumeLiters(
+                  persistedValue.fillVolumeLiters,
+                  currentState.fillVolumeLiters,
+                )
+              : currentState.fillVolumeLiters,
           favoriteAlertPrice:
             persistedValue.favoriteAlertPrice ?? currentState.favoriteAlertPrice,
         };

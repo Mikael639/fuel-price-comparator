@@ -1,3 +1,4 @@
+import { appConfig } from "@/config/app";
 import { ApiServiceError } from "@/services/apiClient";
 import type { Coordinates, LocationSource, PersistedLocation } from "@/types/station";
 import type { FuelStationsState } from "@/store/fuelStationsStore.types";
@@ -7,6 +8,18 @@ type StoreSet = (
     | Partial<FuelStationsState>
     | ((state: FuelStationsState) => Partial<FuelStationsState>),
 ) => void;
+
+export const MIN_FILL_VOLUME_LITERS = 5;
+export const MAX_FILL_VOLUME_LITERS = 120;
+export const SMART_FILL_VOLUME_PRESETS = [35, 50, 65, 80] as const;
+
+export const normalizeFillVolumeLiters = (
+  value: number | null | undefined,
+  fallback = appConfig.stations.defaultTankVolumeLiters,
+) => {
+  const candidate = Number.isFinite(value) ? Number(value) : fallback;
+  return Math.min(MAX_FILL_VOLUME_LITERS, Math.max(MIN_FILL_VOLUME_LITERS, Math.round(candidate)));
+};
 
 export const persistLocation = (
   position: Coordinates | null,
