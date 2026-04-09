@@ -28,6 +28,10 @@ const normalizeProxyApiBaseUrl = (value: string | undefined) => {
 const proxyApiBaseUrl = normalizeProxyApiBaseUrl(import.meta.env.VITE_PROXY_API_BASE_URL);
 
 const withProxy = (path: string, fallback: string) => (proxyApiBaseUrl ? `${proxyApiBaseUrl}${path}` : fallback);
+const sameOriginApi = (path: string) => `/api${path}`;
+const defaultOsmApiUrl =
+  import.meta.env.VITE_OVERPASS_URL ??
+  (import.meta.env.PROD ? sameOriginApi("/osm/brand") : "https://overpass-api.de/api/interpreter");
 
 export const appConfig = {
   theme: {
@@ -66,7 +70,7 @@ export const appConfig = {
   osm: {
     overpassUrl: withProxy(
       "/osm/brand",
-      import.meta.env.VITE_OVERPASS_URL ?? "https://overpass-api.de/api/interpreter",
+      defaultOsmApiUrl,
     ),
     timeoutMs: parseNumber(import.meta.env.VITE_OVERPASS_TIMEOUT_MS, 8_000),
   },

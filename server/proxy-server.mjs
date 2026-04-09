@@ -1,10 +1,10 @@
 import http from "node:http";
 import { URL } from "node:url";
 import XLSX from "xlsx";
+import { proxyOsmBrandLookup } from "./osm-brand.mjs";
 import { handlePriceFeedbackRequest } from "./price-feedback.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
-const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
 const OSRM_URL = process.env.OSRM_URL ?? "https://router.project-osrm.org/route/v1/driving";
 const DGCCRF_RECORDS_URL =
   "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
@@ -26,10 +26,7 @@ const cache = new Map();
 const GEOCODING_SUCCESS_TTL_MS = 30 * 60 * 1000;
 const GEOCODING_RATE_LIMIT_TTL_MS = 2 * 60 * 1000;
 const ROUTE_SUCCESS_TTL_MS = 30 * 60 * 1000;
-const OSM_BRAND_FAILURE_TTL_MS = 10 * 60 * 1000;
-const OSM_BRAND_RATE_LIMIT_TTL_MS = 15 * 60 * 1000;
 let geocodingRateLimitedUntil = 0;
-let osmRateLimitedUntil = 0;
 
 const setCorsHeaders = (response) => {
   response.setHeader("Access-Control-Allow-Origin", "*");
@@ -150,54 +147,6 @@ const proxyGeocodingSearch = async (searchParams) => {
     }
 
     throw new ProxyHttpError(503, "Le geocodage est temporairement indisponible.");
-  }
-};
-
-const proxyOsmBrandLookup = async (query) => {
-  const normalizedQuery = query.trim();
-
-  if (!normalizedQuery) {
-    return { elements: [] };
-  }
-
-  const cacheKey = `osm-brand:${normalizedQuery}`;
-  const cachedPayload = getCachedValue(cacheKey);
-
-  if (cachedPayload) {
-    return cachedPayload;
-  }
-
-  if (osmRateLimitedUntil > Date.now()) {
-    return { elements: [] };
-  }
-
-  try {
-    const payload = await proxyJsonRequest(OVERPASS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=UTF-8",
-        "User-Agent": "FuelFlashProxy/1.0",
-      },
-      body: normalizedQuery,
-    });
-
-    setCachedValue(cacheKey, payload, 24 * 60 * 60 * 1000);
-    return payload;
-  } catch (error) {
-    if (error instanceof ProxyHttpError && error.status === 429) {
-      osmRateLimitedUntil = Math.max(osmRateLimitedUntil, Date.now() + OSM_BRAND_RATE_LIMIT_TTL_MS);
-      console.warn("[proxy] OSM rate limit reached. Brand enrichment paused temporarily.");
-      const fallbackPayload = { elements: [] };
-      setCachedValue(cacheKey, fallbackPayload, OSM_BRAND_RATE_LIMIT_TTL_MS);
-      return fallbackPayload;
-    }
-
-    console.warn(
-      `[proxy] OSM brand lookup unavailable: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
-    const fallbackPayload = { elements: [] };
-    setCachedValue(cacheKey, fallbackPayload, OSM_BRAND_FAILURE_TTL_MS);
-    return fallbackPayload;
   }
 };
 
