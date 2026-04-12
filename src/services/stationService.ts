@@ -977,15 +977,24 @@ class StationService {
       return "stable";
     }
 
-    const first = history[0]?.price ?? history[history.length - 1].price;
-    const last = history[history.length - 1]?.price ?? first;
+    // Look at the last 7 points or all points if fewer
+    const points = history.slice(-7);
+    const first = points[0].price;
+    const last = points[points.length - 1].price;
     const delta = last - first;
 
-    if (delta > 0.01) {
+    // We consider a trend "significant" if it's more than 0.5% change
+    // or more than 0.01€ absolute change
+    const thresholdPercentage = 0.005;
+    const thresholdAbsolute = 0.01;
+    
+    const percentageChange = Math.abs(delta / first);
+
+    if (delta > thresholdAbsolute || (delta > 0 && percentageChange > thresholdPercentage)) {
       return "up";
     }
 
-    if (delta < -0.01) {
+    if (delta < -thresholdAbsolute || (delta < 0 && percentageChange > thresholdPercentage)) {
       return "down";
     }
 

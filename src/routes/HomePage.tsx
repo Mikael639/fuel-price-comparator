@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { BarChart3, ChevronRight, DatabaseZap, Globe, MapPinOff, SearchX } from "lucide-react";
 import { Link } from "react-router-dom";
 import { InfoBanner } from "@/components/common/InfoBanner";
@@ -197,7 +198,11 @@ export const HomePage = () => {
   );
 
   return (
-    <div className="container py-6 md:py-8">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="container py-6 md:py-8"
+    >
       <section className="mb-6 md:mb-8">
         <Card className="glass-panel relative overflow-hidden">
           <div
@@ -384,17 +389,31 @@ export const HomePage = () => {
                   title="Vos stations favorites"
                 />
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <motion.div 
+                className="grid gap-4 md:grid-cols-2"
+                variants={{
+                  visible: { transition: { staggerChildren: 0.1 } }
+                }}
+                initial="hidden"
+                animate="visible"
+              >
                 {favoriteStations.map((station) => (
-                  <StationCard
-                    averagePrice={stats.averagePrice}
-                    isBest={station.id === bestStation?.id}
+                  <motion.div
                     key={station.id}
-                    selectedFuel={selectedFuel}
-                    station={station}
-                  />
+                    variants={{
+                      hidden: { opacity: 0, y: 15 },
+                      visible: { opacity: 1, y: 0 }
+                    }}
+                  >
+                    <StationCard
+                      averagePrice={stats.averagePrice}
+                      isBest={station.id === bestStation?.id}
+                      selectedFuel={selectedFuel}
+                      station={station}
+                    />
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </section>
           ) : null}
 
@@ -446,17 +465,31 @@ export const HomePage = () => {
                 />
                 <Badge variant="secondary">{savingsHero}</Badge>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <motion.div 
+                className="flex flex-col gap-6"
+                variants={{
+                  visible: { transition: { staggerChildren: 0.1 } }
+                }}
+                initial="hidden"
+                animate="visible"
+              >
                 {nearbyStations.map((station) => (
-                  <StationCard
-                    averagePrice={stats.averagePrice}
-                    isBest={station.id === bestStation?.id}
+                  <motion.div
                     key={station.id}
-                    selectedFuel={selectedFuel}
-                    station={station}
-                  />
+                    variants={{
+                      hidden: { opacity: 0, y: 20 },
+                      visible: { opacity: 1, y: 0 }
+                    }}
+                  >
+                    <StationCard
+                      averagePrice={stats.averagePrice}
+                      isBest={station.id === bestStation?.id}
+                      selectedFuel={selectedFuel}
+                      station={station}
+                    />
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </section>
           ) : null}
 
@@ -528,6 +561,6 @@ export const HomePage = () => {
           </section>
         </>
       )}
-    </div>
+    </motion.div>
   );
 };

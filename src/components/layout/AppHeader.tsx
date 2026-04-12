@@ -1,13 +1,8 @@
-import { Fuel, MoonStar, SunMedium } from "lucide-react";
+import { Fuel } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { useFuelStationsStore } from "@/store/useFuelStationsStore";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 export const AppHeader = () => {
-  const themeName = useFuelStationsStore((state) => state.themeName);
-  const setTheme = useFuelStationsStore((state) => state.setTheme);
-  const isDark = themeName === "fuelDark";
-
   return (
     <header className="sticky top-0 z-30 border-b border-white/25 bg-white/72 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/68">
       <div className="container py-4">
@@ -24,9 +19,7 @@ export const AppHeader = () => {
             </div>
           </Link>
 
-          <Button onClick={() => setTheme(isDark ? "fuelLight" : "fuelDark")} size="icon" variant="tonal">
-            {isDark ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
-          </Button>
+          <ThemeToggle />
         </div>
       </div>
     </header>
