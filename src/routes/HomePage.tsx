@@ -257,8 +257,8 @@ export const HomePage = () => {
 
               <div className="space-y-4">
                 <div>
-                  <div className="font-display text-4xl">{nearbyStations.length}</div>
-                  <div className="text-sm text-white/65">{isRouteMode ? "stations sur le trajet" : "stations dans le rayon"}</div>
+                  <div className="font-display text-5xl font-bold text-gradient-primary tracking-tight">{nearbyStations.length}</div>
+                  <div className="text-sm text-white/65 mt-1">{isRouteMode ? "stations sur le trajet" : "stations dans le rayon"}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-3">

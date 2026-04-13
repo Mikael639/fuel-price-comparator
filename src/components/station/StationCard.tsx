@@ -1,3 +1,4 @@
+import { useRef, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { Eye, MapPin, Navigation, PiggyBank, Star, TrendingDown, TrendingUp, Minus, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +21,7 @@ interface StationCardProps {
 }
 
 export const StationCard = ({ station, selectedFuel, averagePrice, isBest = false }: StationCardProps) => {
+  const cardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const toggleFavorite = useFuelStationsStore((state) => state.toggleFavorite);
   const consumption = useFuelStationsStore((state) => state.consumptionLitersPer100Km);
@@ -52,14 +54,28 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
   const TrendIcon = trendMap[station.priceTrend as keyof typeof trendMap] || Minus;
   const trendColor = colorMap[station.priceTrend as keyof typeof colorMap] || "text-slate-400";
 
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    cardRef.current.style.setProperty("--mouse-x", `${x}px`);
+    cardRef.current.style.setProperty("--mouse-y", `${y}px`);
+  };
+
   return (
     <motion.div
       whileHover={{ y: -4, scale: 1.005 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       className="h-full"
     >
-      <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-primary/10 glass-panel border-emerald-500/10 h-full">
-        <CardContent className="space-y-5 p-5 md:p-6">
+      <Card 
+        ref={cardRef}
+        onMouseMove={handleMouseMove}
+        className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-primary/10 glass-panel spotlight-card border-emerald-500/10 h-full"
+      >
+        <CardContent className="space-y-5 p-5 md:p-6 relative z-10">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-3 flex-1">
               <div className="flex flex-wrap gap-2">
@@ -163,7 +179,9 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
               </div>
               <div>
                 <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-none mb-1">Gain net estime</p>
-                <p className="text-lg font-display font-bold text-slate-900 dark:text-white">+{formatMoney(netSavings)} <span className="text-sm font-normal text-muted-foreground">sur un plein de {fillVolume}L</span></p>
+                <p className="text-lg font-display font-bold text-slate-900 dark:text-white">
+                  <span className="text-gradient-amber">+{formatMoney(netSavings)}</span> <span className="text-sm font-normal text-muted-foreground">sur un plein de {fillVolume}L</span>
+                </p>
               </div>
             </div>
           )}

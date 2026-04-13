@@ -71,24 +71,110 @@
 
 @layer components {
   .glass-panel {
-    @apply rounded-[28px] border border-white/60 bg-white/75 shadow-glow backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/60;
+    @apply rounded-[28px] border border-white/60 bg-white/70 shadow-glow backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/60 relative;
+  }
+
+  /* Texture de bruit pour le glassmorphism premium */
+  .glass-panel::before {
+    content: "";
+    @apply absolute inset-0 rounded-[28px] pointer-events-none opacity-[0.03] dark:opacity-[0.05];
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   }
 
   .surface-panel {
-    @apply rounded-[24px] border bg-card/90 shadow-xl shadow-slate-950/5 backdrop-blur dark:shadow-black/20;
+    @apply rounded-[24px] border bg-card/90 shadow-xl shadow-slate-950/5 backdrop-blur-xl dark:shadow-black/20;
+  }
+
+  /* Ombre Spotlight interactive */
+  .spotlight-card {
+    @apply relative overflow-hidden transition-all duration-500;
+  }
+
+  .spotlight-card::before {
+    content: "";
+    @apply absolute inset-0 pointer-events-none rounded-[inherit] transition-opacity duration-300 opacity-0;
+    background: radial-gradient(
+      800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(20, 184, 166, 0.08),
+      transparent 40%
+    );
+    z-index: 1;
+  }
+  
+  .dark .spotlight-card::before {
+    background: radial-gradient(
+      800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(45, 212, 191, 0.12),
+      transparent 40%
+    );
+  }
+
+  .spotlight-card:hover::before {
+    @apply opacity-100;
   }
 
   .hero-glow {
-    @apply pointer-events-none fixed z-0 h-72 w-72 blur-3xl;
+    @apply pointer-events-none fixed z-0 h-96 w-96 blur-[100px] mix-blend-multiply dark:mix-blend-screen;
+    animation: meshFloat 18s ease-in-out infinite alternate;
   }
 
   .hero-glow-left {
-    @apply left-[-4rem] top-[-3rem] bg-teal-300/35 dark:bg-teal-400/20;
+    @apply -left-32 -top-32 bg-teal-300/40 dark:bg-teal-500/25;
+    animation-delay: -2s;
   }
 
   .hero-glow-right {
-    @apply right-[-4rem] top-40 bg-amber-300/30 dark:bg-amber-300/15;
+    @apply -right-32 top-32 bg-amber-300/35 dark:bg-amber-400/20;
+    animation-direction: alternate-reverse;
   }
+
+  /* Squelette de chargement premium (shimmer holographique) */
+  .skeleton-premium {
+    @apply relative overflow-hidden bg-slate-200/50 dark:bg-slate-800/50 rounded-2xl;
+  }
+  
+  .skeleton-premium::after {
+    content: "";
+    @apply absolute inset-0;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: shimmer 2s infinite ease-in-out;
+  }
+
+  .dark .skeleton-premium::after {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      transparent 100%
+    );
+  }
+}
+
+@layer utilities {
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-sky-600 dark:from-teal-400 dark:to-sky-400;
+  }
+  
+  .text-gradient-amber {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400;
+  }
+}
+
+@keyframes meshFloat {
+  0% { transform: scale(1) translate(0, 0) rotate(0deg); }
+  33% { transform: scale(1.1) translate(40px, -60px) rotate(5deg); }
+  66% { transform: scale(0.9) translate(-30px, 30px) rotate(-5deg); }
+  100% { transform: scale(1) translate(0, 0) rotate(0deg); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
 .leaflet-container {

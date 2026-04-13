@@ -146,39 +146,39 @@ export const PriceFeedbackPanel = ({
 
   const containerClassName = isInverse
     ? "border-white/12 bg-slate-950/90 text-white shadow-[0_20px_45px_rgba(2,6,23,0.38)]"
-    : "border-slate-200/80 bg-white/75";
-  const bodyCopyClassName = isInverse ? "text-slate-200" : "text-muted-foreground";
-  const loadingClassName = isInverse ? "text-slate-300" : "text-muted-foreground";
+    : "border-slate-200/80 bg-white/75 dark:border-white/10 dark:bg-slate-900/50";
+  const bodyCopyClassName = isInverse ? "text-slate-200" : "text-muted-foreground dark:text-slate-300";
+  const loadingClassName = isInverse ? "text-slate-300" : "text-muted-foreground dark:text-slate-300";
   const priceStripClassName = isInverse
     ? "border-white/12 bg-slate-900/95 text-slate-200"
-    : "border-slate-200/80 bg-slate-50/70 text-muted-foreground";
-  const priceValueClassName = isInverse ? "text-white" : "text-foreground";
-  const summaryBadgeClassName = isInverse ? "border-white/12 bg-white/10 text-slate-50" : "";
-  const confirmationBadgeClassName = isInverse ? "border border-emerald-300/25 bg-emerald-500/18 text-emerald-50" : "";
-  const warningBadgeClassName = isInverse ? "border border-amber-300/25 bg-amber-400/18 text-amber-50" : "";
+    : "border-slate-200/80 bg-slate-50/70 text-muted-foreground dark:border-white/10 dark:bg-slate-950/50 dark:text-slate-300";
+  const priceValueClassName = isInverse ? "text-white" : "text-foreground dark:text-white";
+  const summaryBadgeClassName = isInverse ? "border-white/12 bg-white/10 text-slate-50" : "dark:border-white/10 dark:bg-white/5 dark:text-slate-200";
+  const confirmationBadgeClassName = isInverse ? "border border-emerald-300/25 bg-emerald-500/18 text-emerald-50" : "dark:border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-200";
+  const warningBadgeClassName = isInverse ? "border border-amber-300/25 bg-amber-400/18 text-amber-50" : "dark:border-amber-400/30 dark:bg-amber-400/20 dark:text-amber-200";
   const correctButtonClassName = isInverse
     ? "border border-emerald-300/30 bg-emerald-500/20 text-emerald-50 hover:bg-emerald-500/28"
-    : "";
+    : "dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20";
   const incorrectButtonClassName = isInverse
     ? "border-white/12 bg-slate-900/95 text-white hover:bg-slate-800"
-    : "";
+    : "dark:border-white/10 dark:bg-slate-950/50 dark:text-white dark:hover:bg-slate-900";
   const formPanelClassName = isInverse
     ? "border-amber-300/25 bg-amber-400/12"
-    : "border-amber-400/20 bg-amber-500/5";
-  const formTitleClassName = isInverse ? "text-amber-200" : "text-amber-700 dark:text-amber-300";
-  const formCopyClassName = isInverse ? "text-slate-200" : "text-muted-foreground";
-  const labelClassName = isInverse ? "text-white" : "text-foreground";
+    : "border-amber-400/20 bg-amber-500/5 dark:border-amber-400/20 dark:bg-amber-500/10";
+  const formTitleClassName = isInverse ? "text-amber-200" : "text-amber-700 dark:text-amber-400";
+  const formCopyClassName = isInverse ? "text-slate-200" : "text-muted-foreground dark:text-slate-300";
+  const labelClassName = isInverse ? "text-white" : "text-foreground dark:text-white";
   const inputClassName = isInverse
     ? "border-white/12 bg-slate-950 text-white placeholder:text-slate-400 focus-visible:ring-emerald-400/60"
-    : "";
-  const hintClassName = isInverse ? "text-slate-300" : "text-muted-foreground";
-  const cancelButtonClassName = isInverse ? "text-white hover:bg-white/10" : "";
-  const submitButtonClassName = isInverse ? "bg-amber-500 text-slate-950 hover:bg-amber-400" : "";
+    : "dark:border-white/10 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus-visible:ring-primary";
+  const hintClassName = isInverse ? "text-slate-300" : "text-muted-foreground dark:text-slate-400";
+  const cancelButtonClassName = isInverse ? "text-white hover:bg-white/10" : "dark:text-white dark:hover:bg-white/10";
+  const submitButtonClassName = isInverse ? "bg-amber-500 text-slate-950 hover:bg-amber-400" : "dark:bg-amber-500 dark:text-slate-950 dark:hover:bg-amber-400";
   const alertClassNameByVariant: Record<Notice["variant"], string> = {
-    success: isInverse ? "border-emerald-400/25 bg-emerald-500/18 text-emerald-50" : "",
-    warning: isInverse ? "border-amber-300/25 bg-amber-400/18 text-amber-50" : "",
-    error: isInverse ? "border-red-300/25 bg-red-400/18 text-red-50" : "",
-    info: isInverse ? "border-sky-300/25 bg-sky-400/18 text-sky-50" : "",
+    success: isInverse ? "border-emerald-400/25 bg-emerald-500/18 text-emerald-50" : "dark:border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-200",
+    warning: isInverse ? "border-amber-300/25 bg-amber-400/18 text-amber-50" : "dark:border-amber-400/30 dark:bg-amber-400/20 dark:text-amber-200",
+    error: isInverse ? "border-red-300/25 bg-red-400/18 text-red-50" : "dark:border-red-500/30 dark:bg-red-500/20 dark:text-red-200",
+    info: isInverse ? "border-sky-300/25 bg-sky-400/18 text-sky-50" : "dark:border-sky-500/30 dark:bg-sky-500/20 dark:text-sky-200",
   };
 
   if (displayedPrice == null) {
