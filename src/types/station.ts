@@ -133,3 +133,13 @@ export interface FavoriteAlert {
   title: string;
   description: string;
 }
+
+export interface RecentSearch extends GeocodingResult {
+  savedAt: string;
+}
+
+export interface PricePrediction {
+  trend: PriceTrend;
+  predictedPrice: number | null;
+  deltaFromCurrent: number | null;
+}

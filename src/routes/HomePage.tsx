@@ -60,6 +60,7 @@ export const HomePage = () => {
   const searchRoute = useFuelStationsStore((state) => state.searchRoute);
   const selectRouteLocation = useFuelStationsStore((state) => state.selectRouteLocation);
   const clearRoute = useFuelStationsStore((state) => state.clearRoute);
+  const recentSearches = useFuelStationsStore((state) => state.recentSearches);
   const setSelectedFuel = useFuelStationsStore((state) => state.setSelectedFuel);
   const setRadiusKm = useFuelStationsStore((state) => state.setRadiusKm);
   const setOpenOnly = useFuelStationsStore((state) => state.setOpenOnly);
@@ -301,6 +302,7 @@ export const HomePage = () => {
           onSelectRouteResult={(result) => void selectRouteLocation(result)}
           onSelectSearchResult={selectSearchLocation}
           onClearRoute={clearRoute}
+          recentSearches={recentSearches}
           routeDestination={routeDestination}
           routeError={routeError}
           routePath={routePath}

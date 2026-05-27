@@ -1,6 +1,6 @@
-import { useRef, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
-import { Eye, MapPin, Navigation, PiggyBank, Star, TrendingDown, TrendingUp, Minus, Clock } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Fuel, MapPin, Navigation, PiggyBank, Share2, Star, TrendingDown, TrendingUp, Minus, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { NavigationMenu } from "@/components/station/NavigationMenu";
 import { PriceFeedbackPanel } from "@/components/station/PriceFeedbackPanel";
 import { stationService } from "@/services/stationService";
 import { useFuelStationsStore } from "@/store/useFuelStationsStore";
-import { formatDistance, formatDriveTime, formatMoney, formatPrice, formatFreshness } from "@/utils/format";
+import { FUEL_TYPES } from "@/types/station";
+import { formatDistance, formatDriveTime, formatMoney, formatPrice, formatPriceValue, formatFreshness } from "@/utils/format";
 
 import type { FuelType, StationWithMetrics } from "@/types/station";
 
@@ -26,12 +27,16 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
   const toggleFavorite = useFuelStationsStore((state) => state.toggleFavorite);
   const consumption = useFuelStationsStore((state) => state.consumptionLitersPer100Km);
   const fillVolume = useFuelStationsStore((state) => state.fillVolumeLiters);
-  
+
+  const [showAllFuels, setShowAllFuels] = useState(false);
+  const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
+
   const savings = stationService.getStationSavings(station, averagePrice);
   const netSavings = stationService.getStationNetSavingsForFill(station, averagePrice, fillVolume, consumption);
+  const prediction = stationService.getPricePrediction(station, selectedFuel);
 
   const freshness = formatFreshness(station.priceUpdatedAt?.[selectedFuel] ?? station.lastUpdatedAt);
-  
+
   const isStale = (date: string | null | undefined) => {
     if (!date) return true;
     return Date.now() - new Date(date).getTime() > 48 * 60 * 60 * 1000;
@@ -63,6 +68,31 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
     cardRef.current.style.setProperty("--mouse-y", `${y}px`);
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/station/${station.id}`;
+    const shareData = { title: station.name, text: `${station.name} — ${formatPrice(station.selectedFuelPrice)}`, url };
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // user cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setShareStatus("copied");
+      setTimeout(() => setShareStatus("idle"), 2000);
+    }
+  };
+
+  const allFuelPrices = FUEL_TYPES.filter((f) => station.fuelPrices[f] != null).map((f) => ({
+    fuel: f,
+    price: station.fuelPrices[f]!,
+    isSelected: f === selectedFuel,
+  })).sort((a, b) => a.price - b.price);
+
+  const hasPrediction = prediction.predictedPrice != null && prediction.deltaFromCurrent != null && Math.abs(prediction.deltaFromCurrent) > 0.001;
+  const predictionDelta = prediction.deltaFromCurrent ?? 0;
+
   return (
     <motion.div
       whileHover={{ y: -4, scale: 1.005 }}
@@ -70,7 +100,7 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
       className="h-full"
     >
-      <Card 
+      <Card
         ref={cardRef}
         onMouseMove={handleMouseMove}
         className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-primary/10 glass-panel spotlight-card border-emerald-500/10 h-full"
@@ -103,7 +133,7 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <div>
                   <h3 className="font-display text-xl tracking-tight leading-tight group-hover:text-primary transition-colors">
@@ -119,11 +149,11 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                 </div>
               </div>
             </div>
-            
+
             <div className="flex flex-col items-end gap-1">
-              <button 
+              <button
                 aria-label={station.isFavorite ? "Retirer des favorites" : "Ajouter aux favorites"}
-                onClick={() => toggleFavorite(station.id)} 
+                onClick={() => toggleFavorite(station.id)}
                 className="p-2 -mr-2 rounded-full hover:bg-primary/10 transition-colors"
                 type="button"
               >
@@ -137,6 +167,11 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                     {formatPrice(station.selectedFuelPrice)}
                   </div>
                 </div>
+                {hasPrediction && prediction.predictedPrice != null && (
+                  <p className={`text-[10px] font-medium mt-0.5 ${predictionDelta > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                    Demain ~{formatPriceValue(prediction.predictedPrice)} ({predictionDelta > 0 ? "+" : ""}{predictionDelta.toFixed(3)})
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -153,7 +188,7 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-900/50 p-2 text-sm">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white dark:bg-slate-800 shadow-sm text-primary">
                 <Navigation className="h-4 w-4" />
@@ -168,6 +203,11 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
               <div>
                 <span className="font-bold text-primary block leading-none">-{formatMoney(savings)}</span>
                 <span className="text-[10px] text-primary/70 uppercase font-bold">par litre</span>
+                {station.estimatedFillCost != null && (
+                  <span className="text-[10px] text-muted-foreground block leading-none mt-0.5">
+                    Plein ~{formatMoney(station.estimatedFillCost)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -178,11 +218,51 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                 <TrendingDown className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-none mb-1">Gain net estime</p>
+                <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-none mb-1">Gain net estimé</p>
                 <p className="text-lg font-display font-bold text-slate-900 dark:text-white">
-                  <span className="text-gradient-amber">+{formatMoney(netSavings)}</span> <span className="text-sm font-normal text-muted-foreground">sur un plein de {fillVolume}L</span>
+                  <span className="text-gradient-amber">+{formatMoney(netSavings)}</span>{" "}
+                  <span className="text-sm font-normal text-muted-foreground">sur un plein de {fillVolume}L</span>
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Feature 4 — Comparaison multi-carburants */}
+          {allFuelPrices.length > 1 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAllFuels((v) => !v)}
+                className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Fuel className="h-3.5 w-3.5" />
+                Tous les carburants ({allFuelPrices.length})
+                {showAllFuels ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+              {showAllFuels && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-2 grid grid-cols-2 gap-1.5"
+                >
+                  {allFuelPrices.map(({ fuel, price, isSelected }) => (
+                    <div
+                      key={fuel}
+                      className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm ${
+                        isSelected
+                          ? "bg-primary/10 border border-primary/20"
+                          : "bg-slate-100 dark:bg-slate-900/50"
+                      }`}
+                    >
+                      <span className={`font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>{fuel}</span>
+                      <span className={`font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                        {formatPriceValue(price)}
+                      </span>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
             </div>
           )}
 
@@ -190,25 +270,36 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
 
           <div className="flex flex-col gap-4 pt-2">
             <div className="flex flex-col gap-3 sm:flex-row">
-                <Button 
-                  variant="tonal" 
-                  className="h-11 w-full flex-1 rounded-xl"
-                  onClick={() => navigate(`/station/${station.id}`)} 
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Details
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="h-11 w-full flex-1 rounded-xl"
-                  onClick={() => toggleFavorite(station.id)}
-                >
-                  <Star className={`h-4 w-4 ${station.isFavorite ? "fill-amber-400 text-amber-400" : ""}`} />
-                  {station.isFavorite ? "En favorite" : "Ajouter favorite"}
-                </Button>
+              <Button
+                variant="tonal"
+                className="h-11 w-full flex-1 rounded-xl"
+                onClick={() => navigate(`/station/${station.id}`)}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Details
+              </Button>
+
+              <Button
+                variant="outline"
+                className="h-11 w-full flex-1 rounded-xl"
+                onClick={() => toggleFavorite(station.id)}
+              >
+                <Star className={`h-4 w-4 ${station.isFavorite ? "fill-amber-400 text-amber-400" : ""}`} />
+                {station.isFavorite ? "En favorite" : "Ajouter favorite"}
+              </Button>
+
+              {/* Feature 3 — Partage de lien */}
+              <Button
+                variant="outline"
+                className="h-11 w-auto shrink-0 rounded-xl px-3"
+                onClick={() => void handleShare()}
+                title="Partager cette station"
+              >
+                <Share2 className="h-4 w-4" />
+                {shareStatus === "copied" && <span className="ml-1.5 text-xs">Copié !</span>}
+              </Button>
             </div>
-            
+
             <div className="space-y-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] px-1">GPS Navigation</p>
               <NavigationMenu className="w-full" lat={station.lat} lng={station.lng} />
@@ -219,4 +310,3 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
     </motion.div>
   );
 };
-

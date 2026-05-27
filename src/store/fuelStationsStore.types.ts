@@ -5,6 +5,7 @@ import type {
   GeocodingResult,
   LocationSource,
   PersistedLocation,
+  RecentSearch,
   RoutePath,
   ServiceType,
   SortMode,
@@ -32,6 +33,7 @@ export interface PreferencesSlice {
   consumptionLitersPer100Km: number;
   fillVolumeLiters: number;
   favoriteAlertPrice: number | null;
+  recentSearches: RecentSearch[];
   toggleFavorite: (stationId: string) => void;
   setTheme: (value: ThemeName) => void;
   setSelectedFuel: (value: FuelType) => void;
@@ -43,6 +45,8 @@ export interface PreferencesSlice {
   setFillVolumeLiters: (value: number) => void;
   setFavoriteAlertPrice: (value: number | null) => void;
   setHasHydrated: (value: boolean) => void;
+  addRecentSearch: (result: GeocodingResult) => void;
+  clearRecentSearches: () => void;
 }
 
 export interface LocationSlice {
@@ -110,4 +114,5 @@ export interface PersistedState {
   consumptionLitersPer100Km: number;
   fillVolumeLiters: number;
   favoriteAlertPrice: number | null;
+  recentSearches: RecentSearch[];
 }

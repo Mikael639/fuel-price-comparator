@@ -54,6 +54,7 @@ export const useFuelStationsStore = create<FuelStationsState>()(
         consumptionLitersPer100Km: state.consumptionLitersPer100Km,
         fillVolumeLiters: state.fillVolumeLiters,
         favoriteAlertPrice: state.favoriteAlertPrice,
+        recentSearches: state.recentSearches,
       }),
       merge: (persistedState, currentState) => {
         const persistedData = (
@@ -119,6 +120,7 @@ export const useFuelStationsStore = create<FuelStationsState>()(
               : currentState.fillVolumeLiters,
           favoriteAlertPrice:
             persistedValue.favoriteAlertPrice ?? currentState.favoriteAlertPrice,
+          recentSearches: persistedValue.recentSearches ?? currentState.recentSearches,
         };
       },
     },

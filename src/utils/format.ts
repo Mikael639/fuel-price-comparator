@@ -62,6 +62,8 @@ export const sortModeCopy: Record<SortMode, string> = {
   favorites: "Favoris d'abord",
 };
 
+export const formatPriceValue = (price: number) => priceFormatter.format(price);
+
 export const formatFreshness = (date: string | null | undefined) => {
   if (!date) return "Mise a jour inconnue";
   const now = new Date();

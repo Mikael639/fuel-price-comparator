@@ -12,6 +12,7 @@ import type {
   GeocodingResult,
   PriceHistory,
   PriceHistoryPoint,
+  PricePrediction,
   PriceTrend,
   RoutePath,
   ServiceType,
@@ -1038,6 +1039,42 @@ class StationService {
     }
 
     return officialTrend;
+  }
+
+  getPricePrediction(station: FuelStation, fuel: FuelType): PricePrediction {
+    const history = station.priceHistory[fuel];
+    const currentPrice = station.fuelPrices[fuel] ?? null;
+
+    if (!history || history.length < 3) {
+      return { trend: this.getTrend(station, fuel), predictedPrice: currentPrice, deltaFromCurrent: 0 };
+    }
+
+    const points = history.slice(-14);
+    const n = points.length;
+    const xMean = (n - 1) / 2;
+    const yMean = points.reduce((sum, p) => sum + p.price, 0) / n;
+
+    let numerator = 0;
+    let denominator = 0;
+    points.forEach((point, index) => {
+      const dx = index - xMean;
+      numerator += dx * (point.price - yMean);
+      denominator += dx * dx;
+    });
+
+    if (denominator === 0) {
+      return { trend: "stable", predictedPrice: currentPrice, deltaFromCurrent: 0 };
+    }
+
+    const slope = numerator / denominator;
+    const intercept = yMean - slope * xMean;
+    const rawPredicted = slope * n + intercept;
+    const predictedPrice = Math.max(0.5, rawPredicted);
+    const delta = currentPrice != null ? predictedPrice - currentPrice : null;
+    const trend: PriceTrend =
+      delta == null ? "stable" : delta > 0.01 ? "up" : delta < -0.01 ? "down" : "stable";
+
+    return { trend, predictedPrice, deltaFromCurrent: delta };
   }
 
   getPriceTrendFromSeries(prices: number[]): PriceTrend {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { LoaderCircle, MapPin, Navigation, RefreshCw, Search, X, Flag } from "lucide-react";
+import { Clock, LoaderCircle, MapPin, Navigation, RefreshCw, Search, X, Flag } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance, formatDriveTime } from "@/utils/format";
-import type { GeocodingResult, LocationSource, RoutePath } from "@/types/station";
+import type { GeocodingResult, LocationSource, RecentSearch, RoutePath } from "@/types/station";
 
 interface LocationPanelProps {
   isGeolocating: boolean;
@@ -24,6 +24,7 @@ interface LocationPanelProps {
   routePath: RoutePath | null;
   searchResults: GeocodingResult[];
   routeResults: GeocodingResult[];
+  recentSearches?: RecentSearch[];
   onLocate: () => void;
   onRefresh: () => void;
   onSearchAddress: (query: string, options?: { immediate?: boolean }) => void;
@@ -51,6 +52,7 @@ interface SearchResultsOverlayProps {
   activeIndex: number;
   onSelectResult: (result: GeocodingResult) => void;
   onHighlightResult: (index: number) => void;
+  label?: string;
 }
 
 type SearchResultsOverlayPosition = {
@@ -101,6 +103,7 @@ const SearchResultsOverlay = ({
   activeIndex,
   onSelectResult,
   onHighlightResult,
+  label,
 }: SearchResultsOverlayProps) => {
   const [position, setPosition] = useState<SearchResultsOverlayPosition | null>(null);
 
@@ -140,6 +143,12 @@ const SearchResultsOverlay = ({
         maxHeight: position.maxHeight,
       }}
     >
+      {label && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5">
+          <Clock className="h-3 w-3 text-muted-foreground" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+        </div>
+      )}
       {results.map((result, index) => (
         <button
           aria-label={`${result.label} - ${result.city}`}
@@ -179,6 +188,7 @@ export const LocationPanel = ({
   routePath,
   searchResults,
   routeResults,
+  recentSearches = [],
   onLocate,
   onRefresh,
   onSearchAddress,
@@ -189,8 +199,12 @@ export const LocationPanel = ({
 }: LocationPanelProps) => {
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [activeRouteIndex, setActiveRouteIndex] = useState(-1);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const departureOverlayAnchorRef = useRef<HTMLDivElement | null>(null);
   const destinationOverlayAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  const showRecentSearches = isSearchFocused && searchQuery.trim() === "" && recentSearches.length > 0 && searchResults.length === 0;
+  const departureResultsToShow = showRecentSearches ? recentSearches : searchResults;
 
   useEffect(() => {
     setActiveSearchIndex(searchResults.length > 0 ? 0 : -1);
@@ -246,9 +260,11 @@ export const LocationPanel = ({
               <div className="relative flex-1">
                 <Input
                   aria-controls="departure-results"
-                  aria-expanded={searchResults.length > 0}
+                  aria-expanded={departureResultsToShow.length > 0}
                   aria-haspopup="listbox"
                   value={searchQuery}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setIsSearchFocused(false), 150)}
                   onChange={(event) => onSearchAddress(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "ArrowDown" && searchResults.length > 0) {
@@ -400,7 +416,8 @@ export const LocationPanel = ({
         listId="departure-results"
         onHighlightResult={setActiveSearchIndex}
         onSelectResult={onSelectSearchResult}
-        results={searchResults}
+        results={departureResultsToShow}
+        label={showRecentSearches ? "Recherches récentes" : undefined}
       />
 
       <SearchResultsOverlay

@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import { appConfig } from "@/config/app";
 import type { FuelStationsState, PreferencesSlice } from "@/store/fuelStationsStore.types";
 import { normalizeFillVolumeLiters } from "@/store/fuelStationsStore.utils";
+import type { RecentSearch } from "@/types/station";
 
 export const createPreferencesSlice: StateCreator<
   FuelStationsState,
@@ -20,6 +21,7 @@ export const createPreferencesSlice: StateCreator<
   consumptionLitersPer100Km: appConfig.stations.defaultConsumptionLitersPer100Km,
   fillVolumeLiters: normalizeFillVolumeLiters(appConfig.stations.defaultTankVolumeLiters),
   favoriteAlertPrice: appConfig.stations.defaultFavoriteAlertPrice,
+  recentSearches: [],
   toggleFavorite: (stationId) =>
     set((state) => ({
       favoriteIds: state.favoriteIds.includes(stationId)
@@ -39,4 +41,11 @@ export const createPreferencesSlice: StateCreator<
   setFillVolumeLiters: (value) => set({ fillVolumeLiters: normalizeFillVolumeLiters(value) }),
   setFavoriteAlertPrice: (value) => set({ favoriteAlertPrice: value }),
   setHasHydrated: (value) => set({ hasHydrated: value }),
+  addRecentSearch: (result) =>
+    set((state) => {
+      const filtered = state.recentSearches.filter((r) => r.id !== result.id);
+      const newEntry: RecentSearch = { ...result, savedAt: new Date().toISOString() };
+      return { recentSearches: [newEntry, ...filtered].slice(0, 5) };
+    }),
+  clearRecentSearches: () => set({ recentSearches: [] }),
 });

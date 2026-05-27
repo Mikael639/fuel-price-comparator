@@ -155,6 +155,7 @@ export const createLocationSlice: StateCreator<
       geocodingError: null,
       locationDenied: false,
     });
+    get().addRecentSearch(result);
     applyLocationState(set, coordinates, "search", { placeId: result.id });
     void get().loadStationsForArea(coordinates);
   },

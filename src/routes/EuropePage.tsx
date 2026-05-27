@@ -115,6 +115,9 @@ export default function EuropePage() {
 
   const latestUpdate = europePayload?.updatedAt ?? null;
   const isLiveEuropeData = europePayload?.source === "live";
+  const fallbackAge = latestUpdate
+    ? Math.floor((Date.now() - new Date(latestUpdate).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-teal-950/20">
@@ -196,7 +199,8 @@ export default function EuropePage() {
 
         {!isLiveEuropeData && europePayload ? (
           <Alert variant="warning">
-            Les données live européennes sont indisponibles pour le moment. La page affiche un snapshot embarqué plus ancien.
+            Les données live européennes sont indisponibles pour le moment. La page affiche un snapshot embarqué
+            {fallbackAge != null ? ` (vieux de ${fallbackAge} jour${fallbackAge > 1 ? "s" : ""})` : ""}.
           </Alert>
         ) : null}
 

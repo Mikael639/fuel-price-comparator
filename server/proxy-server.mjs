@@ -1,6 +1,6 @@
 import http from "node:http";
 import { URL } from "node:url";
-import XLSX from "xlsx";
+import { buildEuropeMarketsPayload } from "./europe-markets.mjs";
 import { proxyOsmBrandLookup } from "./osm-brand.mjs";
 import { handlePriceFeedbackRequest } from "./price-feedback.mjs";
 
@@ -11,16 +11,6 @@ const DGCCRF_RECORDS_URL =
 const DGCCRF_HISTORY_URL =
   "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-carburants-quotidien/records";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
-const EUROPE_HISTORY_URL =
-  "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx";
-
-const EUROPE_COUNTRIES = {
-  FR: "France",
-  BE: "Belgique",
-  DE: "Allemagne",
-  ES: "Espagne",
-  IT: "Italie",
-};
 
 const cache = new Map();
 const GEOCODING_SUCCESS_TTL_MS = 30 * 60 * 1000;
@@ -182,73 +172,14 @@ const proxyRouteRequest = async (searchParams) => {
   return payload;
 };
 
-const excelDateToIso = (value) => {
-  if (typeof value !== "number") {
-    return null;
-  }
-
-  const parsedDate = XLSX.SSF.parse_date_code(value);
-
-  if (!parsedDate) {
-    return null;
-  }
-
-  return new Date(Date.UTC(parsedDate.y, parsedDate.m - 1, parsedDate.d)).toISOString();
-};
-
-const buildEuropeMarketsPayload = async ({ forceRefresh = false } = {}) => {
+const buildEuropeMarketsPayloadCached = async ({ forceRefresh = false } = {}) => {
   const cachedPayload = forceRefresh ? null : getCachedValue("europe-markets");
 
   if (cachedPayload) {
     return cachedPayload;
   }
 
-  const response = await fetch(EUROPE_HISTORY_URL);
-
-  if (!response.ok) {
-    throw new Error(`Europe history unavailable (${response.status})`);
-  }
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheet = workbook.Sheets["Prices with taxes"] ?? workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
-  const headerRow = rows[0] ?? [];
-  const dataRows = rows
-    .slice(3)
-    .filter((row) => typeof row[0] === "number")
-    .slice(0, 7)
-    .reverse();
-
-  const markets = Object.entries(EUROPE_COUNTRIES).map(([code, name]) => {
-    const sp95Index = headerRow.indexOf(`${code}_price_with_tax_euro95`);
-    const dieselIndex = headerRow.indexOf(`${code}_price_with_tax_diesel`);
-    const gplIndex = headerRow.indexOf(`${code}_price_with_tax_LPG`);
-
-    return {
-      code,
-      name,
-      currency: "EUR",
-      snapshots: dataRows
-        .map((row) => ({
-          date: excelDateToIso(row[0]),
-          prices: {
-            SP95: typeof row[sp95Index] === "number" ? row[sp95Index] / 1000 : null,
-            Diesel: typeof row[dieselIndex] === "number" ? row[dieselIndex] / 1000 : null,
-            GPL: typeof row[gplIndex] === "number" ? row[gplIndex] / 1000 : null,
-          },
-        }))
-        .filter((snapshot) => snapshot.date != null),
-    };
-  });
-
-  const payload = {
-    markets,
-    source: "live",
-    updatedAt: markets[0]?.snapshots.at(-1)?.date ?? null,
-    sourceLabel: "Commission europeenne • Weekly Oil Bulletin",
-  };
-
+  const payload = await buildEuropeMarketsPayload();
   setCachedValue("europe-markets", payload, 6 * 60 * 60 * 1000);
   return payload;
 };
@@ -317,7 +248,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/europe/markets") {
-      const payload = await buildEuropeMarketsPayload({
+      const payload = await buildEuropeMarketsPayloadCached({
         forceRefresh: url.searchParams.get("refresh") === "1",
       });
       sendJson(response, 200, payload);
