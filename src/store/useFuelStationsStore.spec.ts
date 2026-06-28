@@ -60,7 +60,8 @@ describe("preferencesSlice", () => {
       label: id,
       lat: 0,
       lng: 0,
-      placeId: id,
+      city: "Paris",
+      address: id,
     });
 
     act(() => {
@@ -76,7 +77,7 @@ describe("preferencesSlice", () => {
 
   it("clearRecentSearches empties the list", () => {
     act(() => {
-      useFuelStationsStore.getState().addRecentSearch({ id: "x", label: "x", lat: 0, lng: 0, placeId: "x" });
+      useFuelStationsStore.getState().addRecentSearch({ id: "x", label: "x", lat: 0, lng: 0, city: "Paris", address: "x" });
       useFuelStationsStore.getState().clearRecentSearches();
     });
     expect(useFuelStationsStore.getState().recentSearches).toHaveLength(0);
