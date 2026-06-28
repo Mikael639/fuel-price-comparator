@@ -57,6 +57,22 @@ export default defineConfig({
             },
           },
           {
+            urlPattern: ({ url }) =>
+              url.hostname === "basemaps.cartocdn.com" ||
+              url.hostname.endsWith(".cartocdn.com"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "fuelflash-map-tiles",
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+              expiration: {
+                maxEntries: 512,
+                maxAgeSeconds: 7 * 24 * 60 * 60,
+              },
+            },
+          },
+          {
             urlPattern: ({ request }) =>
               ["style", "script", "worker", "font", "image"].includes(request.destination),
             handler: "CacheFirst",

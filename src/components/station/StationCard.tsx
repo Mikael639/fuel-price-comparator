@@ -1,6 +1,6 @@
 import { useRef, useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Eye, Fuel, MapPin, Navigation, PiggyBank, Share2, Star, TrendingDown, TrendingUp, Minus, Clock } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Fuel, GitCompare, MapPin, Navigation, PiggyBank, Share2, Star, TrendingDown, TrendingUp, Minus, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,12 @@ interface StationCardProps {
   selectedFuel: FuelType;
   averagePrice: number | null;
   isBest?: boolean;
+  isInComparison?: boolean;
+  onToggleCompare?: () => void;
+  compareDisabled?: boolean;
 }
 
-export const StationCard = ({ station, selectedFuel, averagePrice, isBest = false }: StationCardProps) => {
+export const StationCard = ({ station, selectedFuel, averagePrice, isBest = false, isInComparison = false, onToggleCompare, compareDisabled = false }: StationCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const toggleFavorite = useFuelStationsStore((state) => state.toggleFavorite);
@@ -288,7 +291,6 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                 {station.isFavorite ? "En favorite" : "Ajouter favorite"}
               </Button>
 
-              {/* Feature 3 — Partage de lien */}
               <Button
                 variant="outline"
                 className="h-11 w-auto shrink-0 rounded-xl px-3"
@@ -298,6 +300,19 @@ export const StationCard = ({ station, selectedFuel, averagePrice, isBest = fals
                 <Share2 className="h-4 w-4" />
                 {shareStatus === "copied" && <span className="ml-1.5 text-xs">Copié !</span>}
               </Button>
+
+              {onToggleCompare && (
+                <Button
+                  variant={isInComparison ? "tonal" : "outline"}
+                  className={`h-11 w-auto shrink-0 rounded-xl px-3 ${isInComparison ? "ring-2 ring-primary/40" : ""}`}
+                  disabled={compareDisabled && !isInComparison}
+                  onClick={onToggleCompare}
+                  title={isInComparison ? "Retirer de la comparaison" : "Ajouter à la comparaison"}
+                >
+                  <GitCompare className="h-4 w-4" />
+                  {isInComparison && <span className="ml-1.5 text-xs">Comparé</span>}
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">

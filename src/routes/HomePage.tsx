@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BarChart3, ChevronRight, DatabaseZap, Globe, MapPinOff, SearchX } from "lucide-react";
+import { BarChart3, ChevronRight, DatabaseZap, Download, Globe, MapPinOff, SearchX } from "lucide-react";
 import { Link } from "react-router-dom";
 import { InfoBanner } from "@/components/common/InfoBanner";
 import { EmptyStateCard } from "@/components/common/EmptyStateCard";
@@ -11,17 +11,20 @@ import { StationsMap } from "@/components/map/StationsMap";
 import { BestStationCard } from "@/components/station/BestStationCard";
 import { FavoriteAlertsPanel } from "@/components/station/FavoriteAlertsPanel";
 import { StationCard } from "@/components/station/StationCard";
+import { StationComparePanel } from "@/components/station/StationComparePanel";
 import { StationStats } from "@/components/station/StationStats";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFavoriteNotifications } from "@/hooks/useFavoriteNotifications";
 import { useFuelStationsViewModel } from "@/hooks/useFuelStationsViewModel";
 import { stationService } from "@/services/stationService";
 import { useFuelStationsStore } from "@/store/useFuelStationsStore";
 import { FUEL_TYPES } from "@/types/station";
 import { sortModeCopy } from "@/utils/format";
+import { exportStationsToXlsx } from "@/utils/exportStations";
 
 export const HomePage = () => {
   const initialize = useFuelStationsStore((state) => state.initialize);
@@ -83,8 +86,23 @@ export const HomePage = () => {
   const hasActiveZone = Boolean(userPosition);
   const isRouteMode = Boolean(routePath);
 
+  useFavoriteNotifications(favoriteStations, favoriteAlertPrice, selectedFuel);
+
   const [mapMessage, setMapMessage] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const previousLocationRef = useRef<string | null>(null);
+
+  const toggleCompare = useCallback((stationId: string) => {
+    setComparisonIds((prev) =>
+      prev.includes(stationId) ? prev.filter((id) => id !== stationId) : [...prev, stationId].slice(0, 3),
+    );
+  }, []);
+
+  const comparedStations = useMemo(
+    () => nearbyStations.filter((s) => comparisonIds.includes(s.id)),
+    [nearbyStations, comparisonIds],
+  );
   const absoluteCheapestStation = useMemo(() => stationService.getAbsoluteCheapestStation(nearbyStations), [nearbyStations]);
 
   useEffect(() => {
@@ -92,6 +110,11 @@ export const HomePage = () => {
       void initialize();
     }
   }, [hasHydrated, initialize]);
+
+  useEffect(() => {
+    setVisibleCount(10);
+    setComparisonIds([]);
+  }, [locationLabel]);
 
   useEffect(() => {
     const currentMarker = `${locationSource ?? "none"}:${locationLabel ?? ""}`;
@@ -199,7 +222,8 @@ export const HomePage = () => {
   );
 
   return (
-    <motion.div 
+    <>
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="container py-6 md:py-8"
@@ -316,11 +340,12 @@ export const HomePage = () => {
 
       {isLoading ? (
         <section className="grid gap-4">
-          <Skeleton className="h-64" />
+          <Skeleton className="h-12 w-full rounded-2xl" />
+          <Skeleton className="h-[32rem] w-full rounded-[28px]" />
           <div className="grid gap-4 md:grid-cols-3">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
           </div>
         </section>
       ) : (
@@ -465,33 +490,55 @@ export const HomePage = () => {
                   subtitle={`Les stations sont triées par ${sortModeCopy[sortMode].toLowerCase()} ${isRouteMode ? "sur le trajet courant" : "dans le rayon courant"}.`}
                   title="Liste des stations"
                 />
-                <Badge variant="secondary">{savingsHero}</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">{savingsHero}</Badge>
+                  <Button
+                    onClick={() => exportStationsToXlsx(nearbyStations, selectedFuel)}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-xl gap-1.5"
+                    title="Exporter la liste en Excel"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Exporter
+                  </Button>
+                </div>
               </div>
-              <motion.div 
+              <motion.div
                 className="flex flex-col gap-6"
-                variants={{
-                  visible: { transition: { staggerChildren: 0.1 } }
-                }}
+                variants={{ visible: { transition: { staggerChildren: 0.07 } } }}
                 initial="hidden"
                 animate="visible"
               >
-                {nearbyStations.map((station) => (
+                {nearbyStations.slice(0, visibleCount).map((station) => (
                   <motion.div
                     key={station.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
+                    variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
                   >
                     <StationCard
                       averagePrice={stats.averagePrice}
+                      compareDisabled={comparisonIds.length >= 3}
                       isBest={station.id === bestStation?.id}
+                      isInComparison={comparisonIds.includes(station.id)}
+                      onToggleCompare={() => toggleCompare(station.id)}
                       selectedFuel={selectedFuel}
                       station={station}
                     />
                   </motion.div>
                 ))}
               </motion.div>
+
+              {visibleCount < nearbyStations.length && (
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    onClick={() => setVisibleCount((c) => c + 10)}
+                    variant="outline"
+                    className="rounded-2xl px-8"
+                  >
+                    Voir plus ({nearbyStations.length - visibleCount} restantes)
+                  </Button>
+                </div>
+              )}
             </section>
           ) : null}
 
@@ -564,5 +611,15 @@ export const HomePage = () => {
         </>
       )}
     </motion.div>
+
+    {comparedStations.length > 0 && (
+      <StationComparePanel
+        onClear={() => setComparisonIds([])}
+        onRemove={(id) => setComparisonIds((prev) => prev.filter((i) => i !== id))}
+        selectedFuel={selectedFuel}
+        stations={comparedStations}
+      />
+    )}
+  </>
   );
 };

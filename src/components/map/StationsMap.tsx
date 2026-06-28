@@ -15,7 +15,7 @@ import type { Coordinates, FuelType, RoutePath, StationWithMetrics } from "@/typ
 
 const userIcon = L.divIcon({
   className: "map-user-marker",
-  html: '<div class="h-6 w-6 rounded-full border-4 border-teal-300 bg-slate-900 shadow-lg"></div>',
+  html: '<div class="h-6 w-6 rounded-full border-4 border-teal-300 bg-slate-900 shadow-lg" role="img" aria-label="Votre position"></div>',
   iconSize: [24, 24],
   iconAnchor: [12, 12],
 });
@@ -27,14 +27,14 @@ const destinationIcon = L.divIcon({
   iconAnchor: [14, 14],
 });
 
-const createStationIcon = (best: boolean, open: boolean, showPrice: boolean, price?: string) =>
+const createStationIcon = (best: boolean, open: boolean, showPrice: boolean, price?: string, name?: string) =>
   L.divIcon({
     className: "",
     html: `
-      <div class="relative">
+      <div class="relative" role="img" aria-label="${name ? `Station ${name}` : "Station"}, ${open ? "ouverte" : "fermée"}${best ? ", meilleur prix" : ""}${price ? `, ${price}` : ""}">
         <div class="${best ? "animate-pulsepin bg-amber-400" : "bg-teal-600"} h-6 w-6 rounded-full border-4 border-white shadow-lg"></div>
-        <div class="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border border-white ${open ? "bg-emerald-500" : "bg-red-500"}"></div>
-        ${showPrice && price ? `<div class="absolute -top-9 left-1/2 -translate-x-1/2 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-bold text-white">${price}</div>` : ""}
+        <div class="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border border-white ${open ? "bg-emerald-500" : "bg-red-500"}" aria-hidden="true"></div>
+        ${showPrice && price ? `<div class="absolute -top-9 left-1/2 -translate-x-1/2 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-bold text-white" aria-hidden="true">${price}</div>` : ""}
       </div>
     `,
     iconSize: [24, 24],
@@ -79,6 +79,7 @@ const ClusteredStationsLayer = ({
           station.isOpen,
           station.id === bestStationId || index < 2,
           station.selectedFuelPrice != null ? formatPrice(station.selectedFuelPrice) : undefined,
+          station.name,
         ),
         keyboard: true,
         riseOnHover: true,
@@ -86,16 +87,16 @@ const ClusteredStationsLayer = ({
       });
 
       marker.bindPopup(`
-        <div class="map-popup">
+        <div class="map-popup" role="dialog" aria-label="${station.name}">
           <h4 class="map-popup__title">${station.name}</h4>
           <p class="map-popup__meta">${station.address}, ${station.city}</p>
-          <p class="map-popup__meta">${selectedFuel} - ${formatPrice(station.selectedFuelPrice)}</p>
+          <p class="map-popup__meta">${selectedFuel} — <strong>${formatPrice(station.selectedFuelPrice)}</strong></p>
           <p class="map-popup__meta">${
             station.isRouteDetour
-              ? `${station.hasAccurateRouteDetour ? "Detour reel" : "Detour estime"} ${formatDistance(station.distanceKm)}`
+              ? `${station.hasAccurateRouteDetour ? "Détour réel" : "Détour estimé"} ${formatDistance(station.distanceKm)}`
               : formatDistance(station.distanceKm)
-          } - ~ ${formatDriveTime(station.estimatedDriveMinutes)}</p>
-          <p class="map-popup__meta">Selectionnez le marqueur pour ouvrir les actions.</p>
+          } · ~${formatDriveTime(station.estimatedDriveMinutes)}</p>
+          <p class="map-popup__meta" aria-live="polite">Cliquez pour ouvrir les actions.</p>
         </div>
       `);
 

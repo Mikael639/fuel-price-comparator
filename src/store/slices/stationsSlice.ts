@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import { appConfig } from "@/config/app";
+import { localPriceHistoryService } from "@/services/localPriceHistoryService";
 import { routingService } from "@/services/routingService";
 import { stationService } from "@/services/stationService";
 import type {
@@ -335,7 +336,9 @@ export const createStationsSlice: StateCreator<
             return;
           }
 
+          finalStations = localPriceHistoryService.enrichStations(finalStations);
           set({ stations: finalStations });
+          localPriceHistoryService.recordPrices(finalStations);
         } finally {
           if (requestId === activeStationsLoadRequestId) {
             set({ isHydratingHistory: false });
