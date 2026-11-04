@@ -293,7 +293,7 @@ export const StationsMap = ({
               {userPosition ? (
                 <>
                   {!routePath ? (
-                    <Circle center={[userPosition.lat, userPosition.lng]} pathOptions={{ color: "#0f766e", dashArray: "8 8" }} radius={radiusKm * 1000} />
+                    <Circle center={[userPosition.lat, userPosition.lng]} pathOptions={{ color: "#0f766e", dashArray: "8 8", fill: false }} radius={radiusKm * 1000} />
                   ) : null}
                   <Circle center={[userPosition.lat, userPosition.lng]} pathOptions={{ color: "#0f766e", fillColor: "#5eead4", fillOpacity: 0.2 }} radius={260} />
                   <Marker icon={userIcon} position={[userPosition.lat, userPosition.lng]} />
