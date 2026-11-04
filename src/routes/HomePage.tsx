@@ -493,7 +493,7 @@ export const HomePage = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{savingsHero}</Badge>
                   <Button
-                    onClick={() => exportStationsToXlsx(nearbyStations, selectedFuel)}
+                    onClick={() => void exportStationsToXlsx(nearbyStations, selectedFuel)}
                     size="sm"
                     variant="outline"
                     className="h-8 rounded-xl gap-1.5"

@@ -44,43 +44,53 @@ class PriceFeedbackService {
   private readonly pendingSummaryRequests = new Map<string, Promise<PriceFeedbackSummary>>();
 
   getLocalCooldown(stationId: string, fuel: FuelType) {
-    if (typeof window === "undefined") {
+    // localStorage peut lever (mode prive, cookies bloques, quota) : ne jamais casser le rendu.
+    try {
+      if (typeof window === "undefined") {
+        return null;
+      }
+
+      const storageKey = createLocalStorageKey(stationId, fuel);
+      const rawValue = window.localStorage.getItem(storageKey);
+
+      if (!rawValue) {
+        return null;
+      }
+
+      const parsedTime = new Date(rawValue).getTime();
+
+      if (Number.isNaN(parsedTime)) {
+        window.localStorage.removeItem(storageKey);
+        return null;
+      }
+
+      const blockedUntil = parsedTime + appConfig.feedback.cooldownHours * 60 * 60 * 1000;
+
+      if (blockedUntil <= Date.now()) {
+        window.localStorage.removeItem(storageKey);
+        return null;
+      }
+
+      return {
+        submittedAt: rawValue,
+        blockedUntil: new Date(blockedUntil).toISOString(),
+        remainingMs: blockedUntil - Date.now(),
+      };
+    } catch {
       return null;
     }
-
-    const rawValue = window.localStorage.getItem(createLocalStorageKey(stationId, fuel));
-
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsedTime = new Date(rawValue).getTime();
-
-    if (Number.isNaN(parsedTime)) {
-      window.localStorage.removeItem(createLocalStorageKey(stationId, fuel));
-      return null;
-    }
-
-    const blockedUntil = parsedTime + appConfig.feedback.cooldownHours * 60 * 60 * 1000;
-
-    if (blockedUntil <= Date.now()) {
-      window.localStorage.removeItem(createLocalStorageKey(stationId, fuel));
-      return null;
-    }
-
-    return {
-      submittedAt: rawValue,
-      blockedUntil: new Date(blockedUntil).toISOString(),
-      remainingMs: blockedUntil - Date.now(),
-    };
   }
 
   markLocalCooldown(stationId: string, fuel: FuelType, submittedAt = new Date().toISOString()) {
-    if (typeof window === "undefined") {
-      return;
-    }
+    try {
+      if (typeof window === "undefined") {
+        return;
+      }
 
-    window.localStorage.setItem(createLocalStorageKey(stationId, fuel), submittedAt);
+      window.localStorage.setItem(createLocalStorageKey(stationId, fuel), submittedAt);
+    } catch {
+      // Le cooldown reste applique cote serveur ; on ignore l'echec d'ecriture locale.
+    }
   }
 
   peekSummary(stationId: string, fuel: FuelType) {

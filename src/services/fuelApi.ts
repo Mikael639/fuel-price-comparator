@@ -87,6 +87,12 @@ const MAX_DAILY_HISTORY_RECORDS = 100;
 const HISTORY_LIMIT_PER_STATION = 35;
 const HISTORY_BATCH_SIZE = Math.max(1, Math.floor(MAX_DAILY_HISTORY_RECORDS / HISTORY_LIMIT_PER_STATION));
 
+// Les identifiants officiels sont numeriques. On refuse tout le reste avant de
+// les injecter dans la clause `where` ODSQL (evite l'injection via /station/:id).
+const OFFICIAL_STATION_ID_PATTERN = /^\d{1,12}$/;
+
+export const isOfficialStationId = (id: string) => OFFICIAL_STATION_ID_PATTERN.test(id);
+
 const buildNearbyUrl = (position: Coordinates, radiusKm: number) => {
   const params = new URLSearchParams({
     limit: "100",
@@ -192,6 +198,10 @@ class FuelApiService {
   }
 
   async getStationById(id: string, options?: RequestOptions) {
+    if (!isOfficialStationId(id)) {
+      return null;
+    }
+
     const requestUrl = buildStationByIdUrl(id);
     const cachedValue = options?.forceRefresh ? null : this.getCachedValue(this.stationByIdCache, requestUrl);
 
@@ -211,6 +221,10 @@ class FuelApiService {
   }
 
   async getDailyHistory(id: string, options?: RequestOptions) {
+    if (!isOfficialStationId(id)) {
+      return [];
+    }
+
     const requestUrl = buildDailyHistoryUrl(id);
     const cachedValue = options?.forceRefresh ? null : this.getCachedValue(this.dailyHistoryCache, requestUrl);
 
@@ -230,7 +244,7 @@ class FuelApiService {
   }
 
   async getDailyHistoryForStations(ids: string[], options?: RequestOptions) {
-    const uniqueIds = [...new Set(ids.filter(Boolean))];
+    const uniqueIds = [...new Set(ids.filter(isOfficialStationId))];
 
     if (uniqueIds.length === 0) {
       return [];
