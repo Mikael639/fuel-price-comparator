@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
 import { useNavigate } from "react-router-dom";
+import { appConfig } from "@/config/app";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -155,19 +156,17 @@ export const StationsMap = ({
   const mapShellRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
 
-  const tileLayerConfig = useMemo(
-    () =>
-      themeName === "fuelDark"
-        ? {
-            url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-            attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-          }
-        : {
-            url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-            attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-          },
-    [themeName],
-  );
+  const tileLayerConfig = useMemo(() => {
+    const { lightTilesUrl, darkTilesUrl, tileAttribution } = appConfig.map;
+    const useDarkTiles = themeName === "fuelDark" && darkTilesUrl !== "";
+
+    return {
+      url: useDarkTiles ? darkTilesUrl : lightTilesUrl,
+      attribution: tileAttribution,
+      // Sans style sombre dedie, on assombrit les tuiles claires en CSS.
+      invertTiles: themeName === "fuelDark" && !useDarkTiles,
+    };
+  }, [themeName]);
 
   const bounds = useMemo(() => {
     if (!userPosition && stations.length === 0 && !routePath) {
@@ -279,7 +278,10 @@ export const StationsMap = ({
             ) : null}
           </div>
 
-          <div className={cn("overflow-hidden rounded-[24px] border md:rounded-[28px]", isFullscreen ? "h-[calc(100vh-2rem)]" : "h-[22rem] sm:h-[24rem] md:h-[32rem]")}>
+          <div
+            className={cn("overflow-hidden rounded-[24px] border md:rounded-[28px]", isFullscreen ? "h-[calc(100vh-2rem)]" : "h-[22rem] sm:h-[24rem] md:h-[32rem]")}
+            data-tile-filter={tileLayerConfig.invertTiles ? "dark" : undefined}
+          >
             <MapContainer
               center={userPosition ? [userPosition.lat, userPosition.lng] : [48.8566, 2.3522]}
               className="h-full w-full"

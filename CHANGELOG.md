@@ -14,6 +14,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et ce pr
 
 ### Fixed
 
+- Fond de carte vide (filigrane « API KEY REQUIRED ») : CARTO exige desormais une cle d'API. Les tuiles par defaut passent sur OpenStreetMap, sans cle ; le mode sombre assombrit ces tuiles en CSS.
+- Les variables `VITE_MAP_LIGHT_TILES_URL` / `VITE_MAP_DARK_TILES_URL` etaient ignorees (URL en dur dans `StationsMap.tsx`) : elles sont maintenant utilisees, avec `VITE_MAP_TILES_ATTRIBUTION`.
+- Le cache PWA des tuiles reconnait toute URL `/{z}/{x}/{y}.png`, quel que soit le fournisseur.
+- Le cercle du rayon de recherche n'est plus rempli (il voilait toute la carte).
 - Affichage d'un avertissement quand le jeu de demonstration remplace les donnees officielles indisponibles.
 - Fiche station : la station precedente ne reste plus affichee apres un changement d'identifiant.
 - Retours prix : un `localStorage` indisponible ne casse plus le rendu.
