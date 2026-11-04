@@ -1,10 +1,16 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { ProxyHttpError, createSendJson, readRequestBody, toPublicErrorMessage } from "./shared.mjs";
 
 const ALLOWED_FUELS = new Set(["SP95", "SP95-E10", "SP98", "Diesel", "E85", "GPL"]);
 const DEFAULT_COOLDOWN_HOURS = 12;
 const MAX_REASONABLE_PRICE_EUR = 5;
+const MAX_STATION_ID_LENGTH = 32;
+const STATION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+// Garde-fou memoire : au-dela, on refuse de creer de nouvelles entrees.
+const MAX_SUMMARY_RECORDS = 50_000;
+const MAX_SUBMISSION_RECORDS = 200_000;
 const STORE_FILE_PATH = path.resolve(process.cwd(), ".local", "price-feedback.json");
 
 const parseCooldownHours = () => {
@@ -41,13 +47,7 @@ const setCorsHeaders = (response) => {
   response.setHeader("Cache-Control", "no-store");
 };
 
-const sendJson = (response, statusCode, payload) => {
-  setCorsHeaders(response);
-  response.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
-  });
-  response.end(JSON.stringify(payload));
-};
+const sendJson = createSendJson(setCorsHeaders);
 
 const getHeaderValue = (headers, name) => {
   const rawValue = headers?.[name];
@@ -58,21 +58,6 @@ const getHeaderValue = (headers, name) => {
 
   return typeof rawValue === "string" ? rawValue : "";
 };
-
-const readRequestBody = (request) =>
-  new Promise((resolve, reject) => {
-    const chunks = [];
-
-    request.on("data", (chunk) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-
-    request.on("end", () => {
-      resolve(Buffer.concat(chunks).toString("utf8"));
-    });
-
-    request.on("error", reject);
-  });
 
 const readJsonBody = async (request) => {
   if (request.body && typeof request.body === "object") {
@@ -91,6 +76,9 @@ const readJsonBody = async (request) => {
     throw new ValidationError("Le corps JSON du retour prix est invalide.");
   }
 };
+
+const isValidStationId = (stationId) =>
+  stationId.length > 0 && stationId.length <= MAX_STATION_ID_LENGTH && STATION_ID_PATTERN.test(stationId);
 
 const parsePrice = (value) => {
   if (typeof value === "number") {
@@ -223,7 +211,7 @@ const validatePayload = (payload) => {
   const displayedPrice = parsePrice(payload.displayedPrice);
   const suggestedPrice = parsePrice(payload.suggestedPrice);
 
-  if (!stationId) {
+  if (!isValidStationId(stationId)) {
     throw new ValidationError("La station est requise.");
   }
 
@@ -287,6 +275,14 @@ const submitFeedback = async (request, payload) =>
       }
     }
 
+    if (
+      !feedbackStore.summaries[summaryKey] &&
+      (Object.keys(feedbackStore.summaries).length >= MAX_SUMMARY_RECORDS ||
+        Object.keys(feedbackStore.submissions).length >= MAX_SUBMISSION_RECORDS)
+    ) {
+      throw new ProxyHttpError(503, "Le service de retours prix est sature. Reessayez plus tard.");
+    }
+
     const nowIso = new Date().toISOString();
     const summaryRecord =
       feedbackStore.summaries[summaryKey] ?? createEmptySummaryRecord(payload.stationId, payload.fuel);
@@ -338,7 +334,7 @@ export const handlePriceFeedbackRequest = async (request, response) => {
       const stationId = requestUrl.searchParams.get("stationId")?.trim() ?? "";
       const fuel = requestUrl.searchParams.get("fuel")?.trim() ?? "";
 
-      if (!stationId || !ALLOWED_FUELS.has(fuel)) {
+      if (!isValidStationId(stationId) || !ALLOWED_FUELS.has(fuel)) {
         sendJson(response, 400, {
           error: "Les parametres stationId et fuel sont requis.",
           ...buildMeta(),
@@ -390,8 +386,8 @@ export const handlePriceFeedbackRequest = async (request, response) => {
       return;
     }
 
-    sendJson(response, 500, {
-      error: error instanceof Error ? error.message : "Erreur inconnue sur le retour prix",
+    sendJson(response, error instanceof ProxyHttpError ? error.status : 500, {
+      error: toPublicErrorMessage(error),
       ...buildMeta(),
     });
   }

@@ -1,8 +1,10 @@
-import * as XLSX from "xlsx";
 import type { FuelType, StationWithMetrics } from "@/types/station";
 import { FUEL_TYPES } from "@/types/station";
 
-export const exportStationsToXlsx = (stations: StationWithMetrics[], selectedFuel: FuelType) => {
+// xlsx pese ~400 kB : on ne le charge qu'au moment de l'export.
+export const exportStationsToXlsx = async (stations: StationWithMetrics[], selectedFuel: FuelType) => {
+  const XLSX = await import("xlsx");
+
   const rows = stations.map((station, index) => {
     const prices: Record<string, number | string> = {};
     FUEL_TYPES.forEach((fuel) => {

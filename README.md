@@ -32,9 +32,10 @@ npm install
 ### 2. Lancer frontend + proxy
 
 ```bash
-$env:VITE_PROXY_API_BASE_URL="http://localhost:8787"
-npm run dev:full
+VITE_PROXY_API_BASE_URL=http://localhost:8787 npm run dev:full
 ```
+
+Sous PowerShell : `$env:VITE_PROXY_API_BASE_URL="http://localhost:8787"; npm run dev:full`.
 
 Par defaut :
 
@@ -71,6 +72,20 @@ Les plus utiles :
 - Le calcul d'itineraire passe par OSRM.
 - Le proxy local ajoute du cache et des messages d'erreur plus propres.
 
+## Securite du proxy
+
+Le proxy (`server/`) et les fonctions `api/` appliquent quelques garde-fous :
+
+- corps de requete limite a 16 Ko (reponse `413` au-dela)
+- coordonnees d'itineraire validees avant d'etre injectees dans l'URL OSRM
+- le relais OSM n'accepte que la requete Overpass produite par l'application (pas de relais ouvert)
+- identifiants de station valides (numeriques cote API officielle) et caches memoire bornes
+- les erreurs internes ne sont jamais renvoyees telles quelles au client
+
+Limites connues : le stockage des retours prix est un fichier local (`.local/`), donc non persistant sur Vercel
+(repli en memoire) ; `xlsx@0.18.5` (SheetJS) porte des vulnerabilites sans correctif sur npm — il n'est utilise
+que pour ecrire l'export cote client et lire le fichier officiel de la Commission europeenne cote serveur.
+
 ## UX et resilence
 
 - Recherche depart et destination en live avec debounce et annulation des requetes
@@ -79,6 +94,8 @@ Les plus utiles :
 - Affinage des detours reels sur les stations les plus prometteuses
 - Cache proxy pour le geocodage, l'itineraire, OSM et l'Europe
 - Persistance des favoris, filtres et derniere position recherchee
+- Avertissement explicite quand l'API officielle est indisponible et que le jeu de demonstration est affiche
+- Pages secondaires et export XLSX charges a la demande (bundle initial ~160 Ko gzip)
 
 ## Scripts
 

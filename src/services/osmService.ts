@@ -25,7 +25,7 @@ interface CacheEntry {
   value: string | null;
 }
 
-const buildBrandQuery = (lat: number, lng: number) => `
+export const buildBrandQuery = (lat: number, lng: number) => `
 [out:json][timeout:20];
 (
   node["amenity"="fuel"](around:90,${lat},${lng});

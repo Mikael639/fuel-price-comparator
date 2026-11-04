@@ -1,90 +1,24 @@
+import {
+  ProxyHttpError,
+  createSendJson,
+  createTtlCache,
+  isAllowedOsmBrandQuery,
+  proxyJsonRequest,
+  readRequestBody,
+  toPublicErrorMessage,
+} from "./shared.mjs";
+
 const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
 
-const cache = new Map();
+const cache = createTtlCache(2000);
 const OSM_BRAND_SUCCESS_TTL_MS = 24 * 60 * 60 * 1000;
 const OSM_BRAND_FAILURE_TTL_MS = 10 * 60 * 1000;
 const OSM_BRAND_RATE_LIMIT_TTL_MS = 15 * 60 * 1000;
 
 let osmRateLimitedUntil = 0;
 
-class ProxyHttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.name = "ProxyHttpError";
-    this.status = status;
-  }
-}
-
-const getCachedValue = (key) => {
-  const entry = cache.get(key);
-
-  if (!entry) {
-    return null;
-  }
-
-  if (entry.expiresAt <= Date.now()) {
-    cache.delete(key);
-    return null;
-  }
-
-  return entry.value;
-};
-
-const setCachedValue = (key, value, ttlMs) => {
-  cache.set(key, {
-    value,
-    expiresAt: Date.now() + ttlMs,
-  });
-};
-
-const sanitizeUpstreamErrorMessage = (payload, status) => {
-  const normalized = payload
-    ?.replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!normalized) {
-    return `Proxy upstream error (${status})`;
-  }
-
-  return normalized.slice(0, 220);
-};
-
-const proxyJsonRequest = async (targetUrl, init = {}) => {
-  const response = await fetch(targetUrl, init);
-  const payload = await response.text();
-
-  if (!response.ok) {
-    throw new ProxyHttpError(response.status, sanitizeUpstreamErrorMessage(payload, response.status));
-  }
-
-  return JSON.parse(payload);
-};
-
-const readRequestBody = (request) =>
-  new Promise((resolve, reject) => {
-    if (typeof request.body === "string") {
-      resolve(request.body);
-      return;
-    }
-
-    if (Buffer.isBuffer(request.body)) {
-      resolve(request.body.toString("utf8"));
-      return;
-    }
-
-    const chunks = [];
-
-    request.on("data", (chunk) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-
-    request.on("end", () => {
-      resolve(Buffer.concat(chunks).toString("utf8"));
-    });
-
-    request.on("error", reject);
-  });
+const getCachedValue = (key) => cache.get(key);
+const setCachedValue = (key, value, ttlMs) => cache.set(key, value, ttlMs);
 
 const setCorsHeaders = (response) => {
   response.setHeader("Access-Control-Allow-Origin", "*");
@@ -92,19 +26,17 @@ const setCorsHeaders = (response) => {
   response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 };
 
-const sendJson = (response, statusCode, payload) => {
-  setCorsHeaders(response);
-  response.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
-  });
-  response.end(JSON.stringify(payload));
-};
+const sendJson = createSendJson(setCorsHeaders);
 
 export const proxyOsmBrandLookup = async (query) => {
   const normalizedQuery = query.trim();
 
   if (!normalizedQuery) {
     return { elements: [] };
+  }
+
+  if (!isAllowedOsmBrandQuery(normalizedQuery)) {
+    throw new ProxyHttpError(400, "Requete OSM non autorisee.");
   }
 
   const cacheKey = `osm-brand:${normalizedQuery}`;
@@ -167,8 +99,8 @@ export const handleOsmBrandRequest = async (request, response) => {
     const payload = await proxyOsmBrandLookup(query);
     sendJson(response, 200, payload);
   } catch (error) {
-    sendJson(response, 500, {
-      error: error instanceof Error ? error.message : "Unknown OSM proxy error",
+    sendJson(response, error instanceof ProxyHttpError ? error.status : 500, {
+      error: toPublicErrorMessage(error),
     });
   }
 };

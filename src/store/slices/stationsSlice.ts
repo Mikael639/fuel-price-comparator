@@ -202,6 +202,9 @@ const hydrateRouteDetours = async (
   }
 };
 
+export const FALLBACK_DATA_WARNING =
+  "Les prix officiels sont indisponibles pour le moment : les stations affichees proviennent d'un jeu de demonstration et peuvent ne pas refleter les prix reels.";
+
 export const createStationsSlice: StateCreator<
   FuelStationsState,
   [],
@@ -363,7 +366,7 @@ export const createStationsSlice: StateCreator<
         genericError:
           fallbackStations.length === 0
             ? "Impossible de charger les stations. Veuillez reessayer."
-            : null,
+            : FALLBACK_DATA_WARNING,
       });
     } finally {
       if (stationsLoadController === requestController) {

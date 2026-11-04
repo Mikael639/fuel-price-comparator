@@ -32,17 +32,30 @@ export const StationDetailPage = () => {
   const [remoteStation, setRemoteStation] = useState<FuelStation | null>(null);
   const [activeFuel, setActiveFuel] = useState<FuelType>("Diesel");
 
+  // `remoteStation` peut rester celle de l'id precedent le temps du chargement :
+  // on ne l'utilise que si elle correspond bien a l'id de la route courante.
   const station = useMemo(
-    () => remoteStation ?? stations.find((item) => item.id === id) ?? null,
+    () => (remoteStation?.id === id ? remoteStation : null) ?? stations.find((item) => item.id === id) ?? null,
     [id, remoteStation, stations],
   );
 
   useEffect(() => {
+    let isCancelled = false;
+
+    setRemoteStation(null);
+
     void (async () => {
       await initialize();
       const fetched = await loadStationById(id);
-      setRemoteStation(fetched);
+
+      if (!isCancelled) {
+        setRemoteStation(fetched);
+      }
     })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [id, initialize, loadStationById]);
 
   useEffect(() => {

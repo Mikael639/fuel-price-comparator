@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        // Chargee a la demande (export XLSX) : inutile de la precacher a chaque installation du SW.
+        globIgnores: ["**/xlsx-*.js"],
         navigateFallback: "index.html",
         runtimeCaching: [
           {
@@ -91,6 +93,17 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-map": ["leaflet", "leaflet.markercluster", "react-leaflet"],
+          "vendor-charts": ["chart.js", "react-chartjs-2"],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
