@@ -42,7 +42,9 @@ jobs:
         run: npm run build
 
   e2e:
-    runs-on: ubuntu-latest
+    # Playwright 1.58 ne supporte pas encore Ubuntu 26.04 (nouvelle image ubuntu-latest) :
+    # `playwright install --with-deps` echoue. A rebasculer sur ubuntu-latest apres mise a jour de Playwright.
+    runs-on: ubuntu-24.04
     needs: test-and-build
 
     steps:
