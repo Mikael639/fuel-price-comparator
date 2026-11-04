@@ -88,13 +88,16 @@ export const appConfig = {
     cooldownHours: parseNumber(import.meta.env.VITE_PRICE_FEEDBACK_COOLDOWN_HOURS, 12),
   },
   map: {
+    // Fond de carte par defaut : tuiles OpenStreetMap (sans cle d'API).
+    // CARTO exige desormais une cle ; pour un autre fournisseur (MapTiler, Stadia...),
+    // definir VITE_MAP_LIGHT_TILES_URL (+ VITE_MAP_DARK_TILES_URL si un style sombre existe).
     lightTilesUrl:
-      import.meta.env.VITE_MAP_LIGHT_TILES_URL ??
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    darkTilesUrl:
-      import.meta.env.VITE_MAP_DARK_TILES_URL ??
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    tileAttribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      import.meta.env.VITE_MAP_LIGHT_TILES_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    // Vide = on reutilise les tuiles claires avec un filtre CSS sombre.
+    darkTilesUrl: import.meta.env.VITE_MAP_DARK_TILES_URL || "",
+    tileAttribution:
+      import.meta.env.VITE_MAP_TILES_ATTRIBUTION ||
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
   },
   proxy: {
     apiBaseUrl: proxyApiBaseUrl,

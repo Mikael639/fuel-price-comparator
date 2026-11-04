@@ -59,9 +59,9 @@ export default defineConfig({
             },
           },
           {
+            // Tuiles raster /{z}/{x}/{y}[@2x].png : independant du fournisseur configure.
             urlPattern: ({ url }) =>
-              url.hostname === "basemaps.cartocdn.com" ||
-              url.hostname.endsWith(".cartocdn.com"),
+              /\/\d{1,2}\/\d+\/\d+(@2x)?\.(png|jpe?g|webp)$/.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "fuelflash-map-tiles",

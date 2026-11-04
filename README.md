@@ -63,6 +63,11 @@ Les plus utiles :
 - `VITE_STATION_RELOAD_DEBOUNCE_MS`
 - `VITE_GEOCODING_SEARCH_DEBOUNCE_MS`
 - `VITE_ROUTING_TIMEOUT_MS`
+- `VITE_MAP_LIGHT_TILES_URL`, `VITE_MAP_DARK_TILES_URL`, `VITE_MAP_TILES_ATTRIBUTION` (fond de carte)
+
+Fond de carte : par defaut les tuiles OpenStreetMap (sans cle). Leur [politique d'usage](https://operations.osmfoundation.org/policies/tiles/)
+convient a un usage modere ; pour un trafic important, utilisez un fournisseur dedie (MapTiler, Stadia, Thunderforest...)
+ou auto-hebergez les tuiles via ces variables. CARTO exige desormais une cle d'API.
 
 ## Fonctionnement des donnees
 
